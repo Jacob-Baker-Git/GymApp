@@ -4,6 +4,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -40,6 +41,7 @@ import java.util.Set;
 
 public class GymApp extends JFrame {
     private final Map<DayOfWeek, ArrayList<ExerciseData>> weeklyRoutine = new HashMap<>();
+    private final Map<LocalDate, ArrayList<ExerciseData>> datedWorkoutLogs = new HashMap<>();
     private final ArrayList<LocalDate> timelineDates = new ArrayList<>();
     private final Map<String, Screen> screens = new HashMap<>();
     private final ArrayList<BodyWeightEntry> bodyEntries = new ArrayList<>();
@@ -55,13 +57,13 @@ public class GymApp extends JFrame {
     private Point dragStartPoint;
 
     private final String[] macroLabels = {"Calories", "Protein", "Carbs", "Fats"};
-    private final String[] macroValues = {"2700 kcal", "165g", "310g", "75g"};
+    private final String[] macroValues = {"", "", "", ""};
     private boolean isMacroEditMode;
     private JPanel macroCardsContainer;
     private JButton macroEditBtn;
 
-    private final String[] prLabels = {"Bench Press", "Squat", "Deadlift"};
-    private final String[] prValues = {"100 kg", "140 kg", "180 kg"};
+    private final String[] prLabels = {"Record 1", "Record 2", "Record 3"};
+    private final String[] prValues = {"", "", ""};
     private boolean isPrEditMode;
     private JPanel prCardsContainer;
     private JButton prEditBtn;
@@ -70,7 +72,13 @@ public class GymApp extends JFrame {
     private BarChartPanel historyChart;
     private JPanel bodyLogPanel;
     private LineChartPanel bodyChart;
-    private double heightCm = 178;
+    private double heightCm = 0;
+    private ExerciseData selectedExercise;
+    private JLabel exerciseDetailTitle;
+    private JLabel exerciseDetailStats;
+    private JLabel restTimerLabel;
+    private javax.swing.Timer restTimer;
+    private int remainingRestSeconds;
 
     public GymApp() {
         setTitle("IronPulse Gym Tracker");
@@ -92,6 +100,7 @@ public class GymApp extends JFrame {
         addScreen("PR", createPersonalRecordsScreen());
         addScreen("HISTORY", createHistoryScreen());
         addScreen("BODY", createBodyScreen());
+        addScreen("EXERCISE", createExerciseDetailScreen());
         navigateTo("WORKOUT");
     }
 
@@ -101,14 +110,11 @@ public class GymApp extends JFrame {
         for (int i = -13; i <= 14; i++) {
             timelineDates.add(today.plusDays(i));
         }
-        weeklyRoutine.get(today.getDayOfWeek()).add(new ExerciseData("Bench Press", "82.5", "4x8"));
-        weeklyRoutine.get(today.minusDays(2).getDayOfWeek()).add(new ExerciseData("Squat", "105", "5x5"));
-        weeklyRoutine.get(today.minusDays(4).getDayOfWeek()).add(new ExerciseData("Deadlift", "130", "3x5"));
-        bodyEntries.add(new BodyWeightEntry(today.minusDays(12), 82.6));
-        bodyEntries.add(new BodyWeightEntry(today.minusDays(9), 82.1));
-        bodyEntries.add(new BodyWeightEntry(today.minusDays(6), 81.8));
-        bodyEntries.add(new BodyWeightEntry(today.minusDays(3), 81.5));
-        bodyEntries.add(new BodyWeightEntry(today, 81.2));
+    }
+
+    private void addSeedExercise(LocalDate date, ExerciseData data) {
+        weeklyRoutine.get(date.getDayOfWeek()).add(data);
+        datedWorkoutLogs.computeIfAbsent(date, day -> new ArrayList<>()).add(data);
     }
 
     private void addScreen(String name, JPanel screen) {
@@ -131,24 +137,50 @@ public class GymApp extends JFrame {
         screen.setBackground(Theme.BG_DARK);
         screen.setBorder(BorderFactory.createEmptyBorder(18, 20, 12, 20));
         screen.add(new IconHeader(title, iconType), BorderLayout.NORTH);
-        screen.add(createBottomNav(title), BorderLayout.SOUTH);
+        screen.add(createBottomActionBar(title), BorderLayout.SOUTH);
         return screen;
     }
 
-    private JPanel createBottomNav(String activeTitle) {
-        JPanel nav = new RoundedPanel(22, Theme.PANEL_DARK);
-        nav.setLayout(new GridLayout(1, 5, 4, 0));
-        nav.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        nav.setPreferredSize(new Dimension(430, 68));
-        nav.add(navButton("WORKOUT", "Lift", activeTitle.equals("Workout"), "workout"));
-        nav.add(navButton("MACRO", "Macros", activeTitle.equals("Macros"), "macro"));
-        nav.add(navButton("PR", "PRs", activeTitle.equals("Records"), "pr"));
-        nav.add(navButton("HISTORY", "History", activeTitle.equals("History"), "history"));
-        nav.add(navButton("BODY", "Body", activeTitle.equals("Body"), "body"));
-        return nav;
+    private JPanel createBottomActionBar(String activeTitle) {
+        JPanel wrapper = new JPanel();
+        wrapper.setOpaque(false);
+        wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.Y_AXIS));
+
+        JPanel menu = new RoundedPanel(22, Theme.PANEL_DARK);
+        menu.setLayout(new GridLayout(5, 1, 0, 5));
+        menu.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
+        menu.setMaximumSize(new Dimension(430, 220));
+        menu.setPreferredSize(new Dimension(430, 220));
+        menu.setVisible(false);
+        menu.add(navMenuButton("WORKOUT", "Lift", activeTitle.equals("Workout"), "workout"));
+        menu.add(navMenuButton("MACRO", "Macros", activeTitle.equals("Macros"), "macro"));
+        menu.add(navMenuButton("PR", "PRs", activeTitle.equals("Records"), "pr"));
+        menu.add(navMenuButton("HISTORY", "History", activeTitle.equals("History"), "history"));
+        menu.add(navMenuButton("BODY", "Body", activeTitle.equals("Body"), "body"));
+
+        JPanel circles = new JPanel(new BorderLayout());
+        circles.setOpaque(false);
+        circles.setMaximumSize(new Dimension(430, 66));
+        circles.setPreferredSize(new Dimension(430, 66));
+
+        JButton menuButton = circleButton("menu");
+        JButton addButton = circleButton("plus");
+        menuButton.addActionListener(e -> {
+            menu.setVisible(!menu.isVisible());
+            wrapper.revalidate();
+            wrapper.repaint();
+        });
+        addButton.addActionListener(e -> addExerciseDialog());
+        circles.add(menuButton, BorderLayout.WEST);
+        circles.add(addButton, BorderLayout.EAST);
+
+        wrapper.add(menu);
+        wrapper.add(Box.createRigidArea(new Dimension(0, 8)));
+        wrapper.add(circles);
+        return wrapper;
     }
 
-    private JButton navButton(String target, String label, boolean active, String iconType) {
+    private JButton navMenuButton(String target, String label, boolean active, String iconType) {
         JButton button = new JButton(label) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -162,10 +194,9 @@ public class GymApp extends JFrame {
                     g2.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 16, 16);
                 }
                 g2.setColor(active ? Theme.ACCENT : Theme.TEXT_MUTED);
-                drawMiniIcon(g2, iconType, getWidth() / 2 - 10, 9);
+                drawMiniIcon(g2, iconType, 14, getHeight() / 2 - 10);
                 g2.setFont(Theme.SMALL_BOLD);
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(label, (getWidth() - fm.stringWidth(label)) / 2, 48);
+                g2.drawString(label, 46, getHeight() / 2 + 5);
                 g2.dispose();
             }
         };
@@ -174,6 +205,42 @@ public class GymApp extends JFrame {
         button.setBorderPainted(false);
         button.setFocusPainted(false);
         button.addActionListener(e -> navigateTo(target));
+        return button;
+    }
+
+    private JButton circleButton(String type) {
+        JButton button = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setPaint(Theme.verticalGradient(Theme.ACCENT, getWidth(), getHeight()));
+                g2.fillOval(4, 4, getWidth() - 8, getHeight() - 8);
+                g2.setColor(Theme.ACCENT_GLOW);
+                g2.setStroke(new BasicStroke(2.5f));
+                g2.drawOval(3, 3, getWidth() - 7, getHeight() - 7);
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int cx = getWidth() / 2;
+                int cy = getHeight() / 2;
+                if ("plus".equals(type)) {
+                    g2.drawLine(cx - 11, cy, cx + 11, cy);
+                    g2.drawLine(cx, cy - 11, cx, cy + 11);
+                } else {
+                    g2.drawLine(cx - 12, cy - 8, cx + 12, cy - 8);
+                    g2.drawLine(cx - 12, cy, cx + 12, cy);
+                    g2.drawLine(cx - 12, cy + 8, cx + 12, cy + 8);
+                }
+                g2.dispose();
+            }
+        };
+        button.setPreferredSize(new Dimension(58, 58));
+        button.setMinimumSize(new Dimension(58, 58));
+        button.setMaximumSize(new Dimension(58, 58));
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
         return button;
     }
 
@@ -239,10 +306,12 @@ public class GymApp extends JFrame {
         JButton assessBtn = new RoundedButton("Run Weekly Split Assessment", 15);
         assessBtn.setBackground(Theme.ACCENT);
         assessBtn.setForeground(Color.WHITE);
-        assessBtn.setMaximumSize(new Dimension(420, 42));
+        assessBtn.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+        assessBtn.setMaximumSize(new Dimension(330, 44));
+        assessBtn.setPreferredSize(new Dimension(330, 44));
         content.add(assessBtn);
 
-        content.add(Box.createRigidArea(new Dimension(0, 10)));
+        content.add(Box.createRigidArea(new Dimension(0, 24)));
         assessorFeedback = new JTextArea("Assessment Report will appear here...");
         assessorFeedback.setEditable(false);
         assessorFeedback.setLineWrap(true);
@@ -250,22 +319,16 @@ public class GymApp extends JFrame {
         assessorFeedback.setBackground(Theme.BG_DARK);
         assessorFeedback.setForeground(Theme.TEXT_MUTED);
         assessorFeedback.setFont(Theme.BODY);
+        assessorFeedback.setRows(5);
         content.add(assessorFeedback);
-
-        JButton fabAddBtn = new RoundedButton("+ Add Exercise", 15);
-        fabAddBtn.setBackground(Theme.ACCENT);
-        fabAddBtn.setForeground(Color.WHITE);
-        fabAddBtn.setMaximumSize(new Dimension(420, 42));
-        content.add(Box.createRigidArea(new Dimension(0, 10)));
-        content.add(fabAddBtn);
 
         mainWrapper.add(content, BorderLayout.CENTER);
         mainWrapper.setNavigateHook(this::refreshExerciseListUI);
-        wireWorkoutActions(assessBtn, fabAddBtn);
+        wireWorkoutActions(assessBtn);
         return mainWrapper;
     }
 
-    private JScrollPane createTimelinePanel() {
+    private JComponent createTimelinePanel() {
         JPanel calendarPanel = new JPanel();
         calendarPanel.setLayout(new BoxLayout(calendarPanel, BoxLayout.X_AXIS));
         calendarPanel.setBackground(Theme.BG_DARK);
@@ -328,10 +391,16 @@ public class GymApp extends JFrame {
         };
         calendarPanel.addMouseListener(dragScrollListener);
         calendarPanel.addMouseMotionListener(dragScrollListener);
+        calendarScroll.getViewport().addMouseListener(dragScrollListener);
+        calendarScroll.getViewport().addMouseMotionListener(dragScrollListener);
+        for (java.awt.Component component : calendarPanel.getComponents()) {
+            component.addMouseListener(dragScrollListener);
+            component.addMouseMotionListener(dragScrollListener);
+        }
         return calendarScroll;
     }
 
-    private void wireWorkoutActions(JButton assessBtn, JButton fabAddBtn) {
+    private void wireWorkoutActions(JButton assessBtn) {
         globalEditBtn.addActionListener(e -> {
             isEditMode = !isEditMode;
             globalEditBtn.setText(isEditMode ? "Done" : "Edit Logs");
@@ -339,7 +408,6 @@ public class GymApp extends JFrame {
             globalEditBtn.setForeground(isEditMode ? Color.WHITE : Theme.TEXT_MUTED);
             refreshExerciseListUI();
         });
-        fabAddBtn.addActionListener(e -> addExerciseDialog());
         assessBtn.addActionListener(e -> runAssessment());
     }
 
@@ -437,7 +505,7 @@ public class GymApp extends JFrame {
         center.setOpaque(false);
         JPanel controls = new JPanel(new GridLayout(1, 2, 8, 0));
         controls.setOpaque(false);
-        JButton heightBtn = new RoundedButton("Height: " + (int) heightCm + " cm", 12);
+        JButton heightBtn = new RoundedButton("Set Height", 12);
         JButton addWeightBtn = new RoundedButton("+ Weight", 12);
         heightBtn.setBackground(Theme.PANEL_MID);
         addWeightBtn.setBackground(Theme.ACCENT);
@@ -455,11 +523,11 @@ public class GymApp extends JFrame {
         center.add(logScroll, BorderLayout.SOUTH);
         screen.add(center, BorderLayout.CENTER);
         heightBtn.addActionListener(e -> {
-            String input = JOptionPane.showInputDialog(this, "Height in cm:", heightCm);
+            String input = JOptionPane.showInputDialog(this, "Height in cm:", heightCm > 0 ? heightCm : "");
             if (input != null) {
                 try {
                     heightCm = Double.parseDouble(input.trim());
-                    heightBtn.setText("Height: " + (int) heightCm + " cm");
+                    heightBtn.setText(heightCm > 0 ? "Height: " + (int) heightCm + " cm" : "Set Height");
                     refreshBodyUI();
                 } catch (NumberFormatException ignored) {
                     JOptionPane.showMessageDialog(this, "Enter a valid height.");
@@ -471,14 +539,131 @@ public class GymApp extends JFrame {
         return screen;
     }
 
+    private JPanel createExerciseDetailScreen() {
+        AppScreen screen = createScreenShell("Exercise", "workout");
+        JPanel center = new JPanel();
+        center.setOpaque(false);
+        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
+
+        RoundedPanel detailCard = new RoundedPanel(20, Theme.CARD_BG);
+        detailCard.setLayout(new BoxLayout(detailCard, BoxLayout.Y_AXIS));
+        detailCard.setBorder(BorderFactory.createEmptyBorder(24, 22, 24, 22));
+        detailCard.setMaximumSize(new Dimension(430, 250));
+        detailCard.setPreferredSize(new Dimension(430, 250));
+
+        exerciseDetailTitle = new JLabel("Select an exercise");
+        exerciseDetailTitle.setForeground(Theme.TEXT);
+        exerciseDetailTitle.setFont(Theme.TITLE_FONT);
+        exerciseDetailTitle.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+
+        exerciseDetailStats = new JLabel("Open an exercise from the workout list.");
+        exerciseDetailStats.setForeground(Theme.TEXT_MUTED);
+        exerciseDetailStats.setFont(Theme.BODY);
+        exerciseDetailStats.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+
+        restTimerLabel = new JLabel("Rest timer ready");
+        restTimerLabel.setForeground(Theme.ACCENT_2);
+        restTimerLabel.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 30));
+        restTimerLabel.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+
+        JButton logSetButton = new RoundedButton("Log Set", 16);
+        logSetButton.setBackground(Theme.ACCENT);
+        logSetButton.setForeground(Color.WHITE);
+        logSetButton.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+        logSetButton.setMaximumSize(new Dimension(230, 46));
+        logSetButton.setPreferredSize(new Dimension(230, 46));
+        logSetButton.addActionListener(e -> logSetAndStartRest());
+
+        JButton backButton = new RoundedButton("Back to Workout", 14);
+        backButton.setBackground(Theme.PANEL_MID);
+        backButton.setForeground(Theme.TEXT);
+        backButton.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+        backButton.setMaximumSize(new Dimension(230, 42));
+        backButton.addActionListener(e -> navigateTo("WORKOUT"));
+
+        detailCard.add(exerciseDetailTitle);
+        detailCard.add(Box.createRigidArea(new Dimension(0, 12)));
+        detailCard.add(exerciseDetailStats);
+        detailCard.add(Box.createRigidArea(new Dimension(0, 24)));
+        detailCard.add(restTimerLabel);
+        detailCard.add(Box.createRigidArea(new Dimension(0, 18)));
+        detailCard.add(logSetButton);
+
+        center.add(Box.createRigidArea(new Dimension(0, 30)));
+        center.add(detailCard);
+        center.add(Box.createRigidArea(new Dimension(0, 18)));
+        center.add(backButton);
+        screen.add(center, BorderLayout.CENTER);
+        screen.setNavigateHook(this::refreshExerciseDetail);
+        return screen;
+    }
+
+    private void refreshExerciseDetail() {
+        if (selectedExercise == null) {
+            exerciseDetailTitle.setText("Select an exercise");
+            exerciseDetailStats.setText("Open an exercise from the workout list.");
+            restTimerLabel.setText("Rest timer ready");
+            return;
+        }
+        exerciseDetailTitle.setText(selectedExercise.name);
+        exerciseDetailStats.setText(selectedExercise.weight + " x " + selectedExercise.reps
+                + "  |  Rest " + selectedExercise.restSeconds + "s"
+                + "  |  Sets logged " + selectedExercise.loggedSets);
+        if (remainingRestSeconds <= 0) {
+            restTimerLabel.setText("Rest timer ready");
+        }
+    }
+
+    private void logSetAndStartRest() {
+        if (selectedExercise == null) {
+            return;
+        }
+        selectedExercise.loggedSets++;
+        remainingRestSeconds = selectedExercise.restSeconds;
+        if (restTimer != null) {
+            restTimer.stop();
+        }
+        restTimer = new javax.swing.Timer(1000, e -> {
+            remainingRestSeconds--;
+            updateRestTimerLabel();
+            if (remainingRestSeconds <= 0) {
+                restTimer.stop();
+                restTimerLabel.setText("Rest complete");
+            }
+        });
+        refreshExerciseDetail();
+        updateRestTimerLabel();
+        restTimer.start();
+    }
+
+    private void updateRestTimerLabel() {
+        int minutes = Math.max(0, remainingRestSeconds) / 60;
+        int seconds = Math.max(0, remainingRestSeconds) % 60;
+        restTimerLabel.setText(String.format("Rest %d:%02d", minutes, seconds));
+    }
+
     private void addExerciseDialog() {
         JTextField nameField = new JTextField();
         JTextField weightField = new JTextField();
         JTextField repField = new JTextField();
-        Object[] message = {"Exercise Name:", nameField, "Weight (kg/lbs):", weightField, "Rep Range (e.g. 4x10):", repField};
+        JTextField restField = new JTextField("90");
+        Object[] message = {
+                "Exercise Name:", nameField,
+                "Weight (kg/lbs):", weightField,
+                "Rep Range (e.g. 4x10):", repField,
+                "Rest Time (seconds):", restField
+        };
         int option = JOptionPane.showConfirmDialog(this, message, "Log New Exercise", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.OK_OPTION && !nameField.getText().trim().isEmpty()) {
-            weeklyRoutine.get(currentSelectedDate.getDayOfWeek()).add(new ExerciseData(nameField.getText().trim(), weightField.getText().trim(), repField.getText().trim()));
+            int restSeconds = 90;
+            try {
+                restSeconds = Math.max(5, Integer.parseInt(restField.getText().trim()));
+            } catch (NumberFormatException ignored) {
+                restSeconds = 90;
+            }
+            ExerciseData data = new ExerciseData(nameField.getText().trim(), weightField.getText().trim(), repField.getText().trim(), restSeconds);
+            weeklyRoutine.get(currentSelectedDate.getDayOfWeek()).add(data);
+            datedWorkoutLogs.computeIfAbsent(currentSelectedDate, day -> new ArrayList<>()).add(data);
             refreshExerciseListUI();
         }
     }
@@ -526,6 +711,7 @@ public class GymApp extends JFrame {
                 exerciseCard.setMaximumSize(new Dimension(420, 55));
                 exerciseCard.setPreferredSize(new Dimension(420, 55));
                 exerciseCard.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+                exerciseCard.setToolTipText("Open exercise");
                 JLabel titleLabel = new JLabel(data.name);
                 titleLabel.setFont(Theme.BODY_BOLD);
                 titleLabel.setForeground(Color.WHITE);
@@ -536,6 +722,10 @@ public class GymApp extends JFrame {
                     deleteCardBtn.setForeground(Color.WHITE);
                     deleteCardBtn.setPreferredSize(new Dimension(80, 28));
                     deleteCardBtn.addActionListener(e -> {
+                        ArrayList<ExerciseData> datedLogs = datedWorkoutLogs.get(currentSelectedDate);
+                        if (datedLogs != null) {
+                            datedLogs.remove(data);
+                        }
                         currentLogs.remove(index);
                         refreshExerciseListUI();
                     });
@@ -545,6 +735,13 @@ public class GymApp extends JFrame {
                     statsLabel.setFont(Theme.SMALL);
                     statsLabel.setForeground(Theme.TEXT_MUTED);
                     exerciseCard.add(statsLabel, BorderLayout.EAST);
+                    exerciseCard.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mouseClicked(MouseEvent e) {
+                            selectedExercise = data;
+                            navigateTo("EXERCISE");
+                        }
+                    });
                 }
                 exerciseListPanel.add(exerciseCard);
                 exerciseListPanel.add(Box.createRigidArea(new Dimension(0, 8)));
@@ -557,7 +754,7 @@ public class GymApp extends JFrame {
     private void refreshExerciseChoices() {
         Object selected = historyExerciseSelect.getSelectedItem();
         Set<String> names = new LinkedHashSet<>();
-        for (ArrayList<ExerciseData> logs : weeklyRoutine.values()) {
+        for (ArrayList<ExerciseData> logs : datedWorkoutLogs.values()) {
             for (ExerciseData data : logs) {
                 names.add(data.name);
             }
@@ -580,7 +777,7 @@ public class GymApp extends JFrame {
         for (int i = 13; i >= 0; i--) {
             LocalDate date = today.minusDays(i);
             double total = 0;
-            for (ExerciseData data : weeklyRoutine.get(date.getDayOfWeek())) {
+            for (ExerciseData data : datedWorkoutLogs.getOrDefault(date, new ArrayList<>())) {
                 if (data.name.equals(exercise)) {
                     total += estimateVolume(data);
                 }
@@ -632,8 +829,14 @@ public class GymApp extends JFrame {
         List<BodyWeightEntry> reversed = new ArrayList<>(bodyEntries);
         Collections.reverse(reversed);
         for (BodyWeightEntry entry : reversed) {
-            double bmi = entry.weightKg / (heightMeters * heightMeters);
-            bodyLogPanel.add(new StatCardPanel(entry.date.toString(), String.format("%.1f kg  |  BMI %.1f", entry.weightKg, bmi), false, value -> {}));
+            String value = String.format("%.1f kg", entry.weightKg);
+            if (heightMeters > 0) {
+                double bmi = entry.weightKg / (heightMeters * heightMeters);
+                value += String.format("  |  BMI %.1f", bmi);
+            } else {
+                value += "  |  Set height for BMI";
+            }
+            bodyLogPanel.add(new StatCardPanel(entry.date.toString(), value, false, ignored -> {}));
             bodyLogPanel.add(Box.createRigidArea(new Dimension(0, 8)));
         }
         bodyLogPanel.revalidate();
