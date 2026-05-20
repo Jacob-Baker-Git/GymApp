@@ -4,6 +4,7 @@ public class ExerciseData {
     String reps;
     int restSeconds;
     int loggedSets;
+    boolean completedForHistory;
 
     public ExerciseData(String name, String weight, String reps) {
         this(name, weight, reps, 90);
@@ -15,5 +16,6 @@ public class ExerciseData {
         this.reps = reps;
         this.restSeconds = restSeconds;
         this.loggedSets = 0;
+        this.completedForHistory = false;
     }
 }

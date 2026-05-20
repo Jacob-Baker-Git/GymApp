@@ -11,8 +11,8 @@ public final class Theme {
     public static final Color CARD_BG = new Color(30, 38, 45);
     public static final Color CARD_BG_SELECTED = new Color(44, 61, 66);
     public static final Color BORDER = new Color(72, 86, 94, 135);
-    public static final Color ACCENT = new Color(24, 214, 145);
-    public static final Color ACCENT_DARK = new Color(12, 142, 107);
+    public static final Color ACCENT = new Color(16, 176, 118);
+    public static final Color ACCENT_DARK = new Color(8, 126, 91);
     public static final Color ACCENT_2 = new Color(255, 177, 68);
     public static final Color ACCENT_GLOW = new Color(24, 214, 145, 150);
     public static final Color TEXT = new Color(246, 249, 247);
