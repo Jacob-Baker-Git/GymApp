@@ -34,6 +34,8 @@ public class BarChartPanel extends JPanel {
         int h = getHeight();
         g2.setPaint(Theme.verticalGradient(Theme.PANEL_DARK, w, h));
         g2.fillRoundRect(0, 0, w, h, 18, 18);
+        g2.setColor(Theme.BORDER);
+        g2.drawRoundRect(0, 0, w - 1, h - 1, 18, 18);
         g2.setColor(Theme.TEXT);
         g2.setFont(Theme.BODY_BOLD);
         g2.drawString(title + " volume - past 2 weeks", 18, 28);

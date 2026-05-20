@@ -5,6 +5,9 @@ import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.util.function.Consumer;
@@ -38,10 +41,20 @@ public class StatCardPanel extends RoundedPanel {
             });
             add(editField, BorderLayout.EAST);
         } else {
-            JLabel valueLabel = new JLabel(value);
+            JLabel valueLabel = new JLabel(value == null || value.trim().isEmpty() ? "Tap edit" : value);
             valueLabel.setFont(Theme.BODY);
             valueLabel.setForeground(Theme.TEXT_MUTED);
             add(valueLabel, BorderLayout.EAST);
         }
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setPaint(Theme.verticalGradient(Theme.ACCENT_DARK, 6, getHeight()));
+        g2.fillRoundRect(8, 12, 5, getHeight() - 24, 5, 5);
+        g2.dispose();
     }
 }

@@ -33,8 +33,13 @@ public class RoundedPanel extends JPanel {
         Graphics2D graphics = (Graphics2D) g.create();
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int inset = selected ? 4 : 1;
+        graphics.setColor(new Color(0, 0, 0, selected ? 70 : 45));
+        graphics.fill(new RoundRectangle2D.Double(inset + 2, inset + 5, getWidth() - inset * 2.0 - 4, getHeight() - inset * 2.0 - 4, cornerRadius, cornerRadius));
         graphics.setPaint(Theme.verticalGradient(backgroundColor, getWidth(), getHeight()));
         graphics.fill(new RoundRectangle2D.Double(inset, inset, getWidth() - inset * 2.0, getHeight() - inset * 2.0, cornerRadius, cornerRadius));
+        graphics.setColor(Theme.BORDER);
+        graphics.setStroke(new BasicStroke(1.1f));
+        graphics.draw(new RoundRectangle2D.Double(inset + 0.5, inset + 0.5, getWidth() - inset * 2.0 - 1, getHeight() - inset * 2.0 - 1, cornerRadius, cornerRadius));
         if (selected) {
             graphics.setColor(Theme.ACCENT_GLOW);
             graphics.setStroke(new BasicStroke(2.5f));

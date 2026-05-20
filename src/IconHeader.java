@@ -24,10 +24,17 @@ public class IconHeader extends JComponent {
     protected void paintComponent(Graphics g) {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setPaint(Theme.verticalGradient(Theme.PANEL_DARK, getWidth(), getHeight()));
+        g2.fillRoundRect(0, 4, getWidth(), 54, 20, 20);
+        g2.setColor(Theme.BORDER);
+        g2.drawRoundRect(0, 4, getWidth() - 1, 53, 20, 20);
+        g2.setPaint(Theme.verticalGradient(Theme.ACCENT_DARK, 44, 44));
+        g2.fillRoundRect(8, 10, 42, 42, 16, 16);
         g2.setColor(Theme.ACCENT);
         g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        int x = 12;
+        int x = 10;
         int y = 14;
+        g2.setColor(Color.WHITE);
         if ("workout".equals(type)) {
             g2.drawLine(x + 3, y + 19, x + 36, y + 19);
             g2.draw(new RoundRectangle2D.Double(x + 1, y + 10, 8, 18, 4, 4));
@@ -56,10 +63,10 @@ public class IconHeader extends JComponent {
         g2.setFont(Theme.TITLE_FONT);
         g2.setColor(Theme.TEXT);
         FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(title, 62, 24 + fm.getAscent() / 2);
+        g2.drawString(title, 66, 24 + fm.getAscent() / 2);
         g2.setFont(Theme.SMALL);
         g2.setColor(Theme.TEXT_MUTED);
-        g2.drawString("IronPulse", 63, 50);
+        g2.drawString("IronPulse training dashboard", 67, 50);
         g2.dispose();
     }
 }

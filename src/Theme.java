@@ -4,20 +4,23 @@ import java.awt.GradientPaint;
 import java.awt.Paint;
 
 public final class Theme {
-    public static final Color BG_DARK = new Color(15, 18, 22);
-    public static final Color PANEL_DARK = new Color(26, 31, 37);
-    public static final Color PANEL_MID = new Color(40, 48, 57);
-    public static final Color CARD_BG = new Color(31, 38, 45);
-    public static final Color CARD_BG_SELECTED = new Color(43, 55, 63);
-    public static final Color ACCENT = new Color(22, 205, 137);
-    public static final Color ACCENT_2 = new Color(255, 184, 77);
-    public static final Color ACCENT_GLOW = new Color(22, 205, 137, 145);
+    public static final Color BG_DARK = new Color(11, 14, 18);
+    public static final Color BG_TOP = new Color(21, 29, 34);
+    public static final Color PANEL_DARK = new Color(24, 30, 36);
+    public static final Color PANEL_MID = new Color(42, 52, 60);
+    public static final Color CARD_BG = new Color(30, 38, 45);
+    public static final Color CARD_BG_SELECTED = new Color(44, 61, 66);
+    public static final Color BORDER = new Color(72, 86, 94, 135);
+    public static final Color ACCENT = new Color(24, 214, 145);
+    public static final Color ACCENT_DARK = new Color(12, 142, 107);
+    public static final Color ACCENT_2 = new Color(255, 177, 68);
+    public static final Color ACCENT_GLOW = new Color(24, 214, 145, 150);
     public static final Color TEXT = new Color(246, 249, 247);
     public static final Color TEXT_MUTED = new Color(151, 163, 170);
     public static final Color DANGER = new Color(220, 84, 84);
     public static final Color FIELD_BG = new Color(31, 35, 42);
 
-    public static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 23);
+    public static final Font TITLE_FONT = new Font("Segoe UI Semibold", Font.BOLD, 24);
     public static final Font HEADER_FONT = new Font("Segoe UI", Font.BOLD, 18);
     public static final Font BODY_BOLD = new Font("Segoe UI", Font.BOLD, 14);
     public static final Font BODY = new Font("Segoe UI", Font.PLAIN, 13);

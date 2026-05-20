@@ -5,11 +5,14 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 
 public class RoundedButton extends JButton {
     private final int radius;
     private boolean glowing;
+    private boolean hovering;
 
     public RoundedButton(String label, int radius) {
         super(label);
@@ -21,6 +24,19 @@ public class RoundedButton extends JButton {
         setFont(Theme.SMALL_BOLD);
         setBackground(Theme.PANEL_MID);
         setForeground(Theme.TEXT);
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                hovering = true;
+                repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                hovering = false;
+                repaint();
+            }
+        });
     }
 
     public void setGlowing(boolean glowing) {
@@ -34,8 +50,14 @@ public class RoundedButton extends JButton {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int inset = glowing ? 3 : 1;
 
-        g2.setPaint(Theme.verticalGradient(getBackground(), getWidth(), getHeight()));
+        Color bg = hovering ? Theme.shift(getBackground(), 16) : getBackground();
+        g2.setColor(new Color(0, 0, 0, 55));
+        g2.fill(new RoundRectangle2D.Double(inset + 1, inset + 4, getWidth() - inset * 2.0 - 2, getHeight() - inset * 2.0 - 3, radius, radius));
+        g2.setPaint(Theme.verticalGradient(bg, getWidth(), getHeight()));
         g2.fill(new RoundRectangle2D.Double(inset, inset, getWidth() - inset * 2.0, getHeight() - inset * 2.0, radius, radius));
+        g2.setColor(new Color(255, 255, 255, hovering ? 45 : 24));
+        g2.setStroke(new BasicStroke(1));
+        g2.draw(new RoundRectangle2D.Double(inset + 0.5, inset + 0.5, getWidth() - inset * 2.0 - 1, getHeight() - inset * 2.0 - 1, radius, radius));
 
         if (glowing) {
             g2.setColor(Theme.ACCENT_GLOW);
