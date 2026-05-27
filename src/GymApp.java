@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 public class GymApp extends JFrame {
 
     private final ArrayList<ExerciseData>                        masterExercises  = new ArrayList<>();
+    private final Map<LocalDate, ArrayList<ExerciseData>>        exerciseCache    = new HashMap<>();
     private final Map<LocalDate, ArrayList<ExerciseData>>        datedWorkoutLogs = new HashMap<>();
     private final Map<LocalDate, Map<ExerciseData, Integer>>     loggedSetsByDate = new HashMap<>();
     private final ArrayList<LocalDate>                           timelineDates    = new ArrayList<>();
@@ -156,12 +157,18 @@ public class GymApp extends JFrame {
         int winH = Math.max(640, Math.min(960, (int)(screen.height * 0.88)));
         setSize(winW, winH);
         setLocationRelativeTo(null);
-        Scale.init(winW, winH);
+        // Do NOT call Scale.init here — window isn't laid out yet.
+        // We call it after setVisible() in main().
+        Scale.init(winW, winH); // initial estimate; corrected in componentResized
 
         addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent e) {
-                Scale.init(getWidth(), getHeight());
-                SwingUtilities.updateComponentTreeUI(GymApp.this);
+                int w = getContentPane().getWidth();
+                int h = getContentPane().getHeight();
+                if (w > 0 && h > 0) {
+                    Scale.init(w, h);
+                    SwingUtilities.updateComponentTreeUI(GymApp.this);
+                }
             }
         });
 
@@ -187,21 +194,21 @@ public class GymApp extends JFrame {
     }
 
     private ArrayList<ExerciseData> getExercisesForDate(LocalDate date) {
-        // An exercise belongs to 'date' if:
-        //  - it was added on or before 'date'
-        //  - 'date' is on or after addedDate and the number of days between them is a multiple of 7
-        //  - it is not marked deleted after a specific date (handled by addedDate being per-occurrence)
-        ArrayList<ExerciseData> result = new ArrayList<>();
-        for (ExerciseData ex : masterExercises) {
-            LocalDate added = ex.getAddedDate();
-            if (added.isAfter(date)) continue;
-            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(added, date);
-            if (daysBetween % 7 == 0) result.add(ex);
-        }
-        return result;
+        return exerciseCache.computeIfAbsent(date, d -> {
+            ArrayList<ExerciseData> result = new ArrayList<>();
+            for (ExerciseData ex : masterExercises) {
+                LocalDate added = ex.getAddedDate();
+                if (added.isAfter(d)) continue;
+                long diff = java.time.temporal.ChronoUnit.DAYS.between(added, d);
+                if (diff % 7 == 0) result.add(ex);
+            }
+            return result;
+        });
     }
 
     private boolean dateHasExercises(LocalDate date) {
+        // Intentionally bypass cache — called from paint methods where stale
+        // results cause visual glitches. Fast enough for calendar dot rendering.
         for (ExerciseData ex : masterExercises) {
             LocalDate added = ex.getAddedDate();
             if (added.isAfter(date)) continue;
@@ -209,6 +216,10 @@ public class GymApp extends JFrame {
             if (diff % 7 == 0) return true;
         }
         return false;
+    }
+
+    private void invalidateExerciseCache() {
+        exerciseCache.clear();
     }
 
     private void loadData() {
@@ -283,6 +294,12 @@ public class GymApp extends JFrame {
 
     private void navigateTo(String name) {
         closeOpenMenu();
+        // Stop rest timer if navigating away from exercise screen
+        if (!"EXERCISE".equals(name) && restTimer != null) {
+            stopRestTimer();
+            remainingRestSeconds = 0;
+            if (restTimerLabel != null) restTimerLabel.setText("Rest timer ready");
+        }
         activeScreenName = name;
         cardLayout.show(containerPanel, name);
         Screen s = screens.get(name);
@@ -333,6 +350,14 @@ public class GymApp extends JFrame {
         if (screenHasPlusAction(activeTitle)) {
             JButton addButton = circleButton("plus");
             addButton.addActionListener(e -> handlePlusAction());
+            String tip;
+            switch (activeTitle) {
+                case "Body":      tip = "Add bodyweight entry"; break;
+                case "1RM / PRs": tip = "Add personal record"; break;
+                case "Cardio":    tip = "Log cardio session"; break;
+                default:          tip = "Add exercise"; break;
+            }
+            addButton.setToolTipText(tip);
             circles.add(addButton, BorderLayout.EAST);
         }
 
@@ -540,6 +565,7 @@ public class GymApp extends JFrame {
     }
 
     private void refreshWorkoutScreen() {
+        invalidateExerciseCache();
         refreshExerciseListUI();
         refreshAllDayBoxColours();
         if (streakPanel != null) streakPanel.update(masterExercises, datedWorkoutLogs, restDays);
@@ -619,17 +645,30 @@ public class GymApp extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                boolean isRest  = restDays.contains(date.getDayOfWeek());
-                boolean hasWork = dateHasExercises(date);
-                boolean isToday = date.equals(LocalDate.now());
+                LocalDate today = LocalDate.now();
+                boolean isRest    = restDays.contains(date.getDayOfWeek());
+                boolean hasWork   = dateHasExercises(date);
+                boolean isToday   = date.equals(today);
+                boolean isPast    = date.isBefore(today);
                 Color col;
-                if (isToday)       col = Theme.CAL_TODAY();
-                else if (isRest)   col = Theme.CAL_REST();
-                else if (hasWork)  col = Theme.CAL_WORKOUT();
-                else               col = Theme.TEXT_DIM();
+                if (isToday) {
+                    col = Theme.CAL_TODAY();
+                } else if (isRest) {
+                    col = Theme.CAL_REST();
+                } else if (isPast && hasWork) {
+                    // Check if fully completed
+                    ArrayList<ExerciseData> planned = getExercisesForDate(date);
+                    ArrayList<ExerciseData> done    = datedWorkoutLogs.get(date);
+                    boolean completed = done != null && !planned.isEmpty() && done.containsAll(planned);
+                    col = completed ? Theme.ACCENT : Theme.DANGER;
+                } else if (hasWork) {
+                    col = Theme.CAL_WORKOUT();
+                } else {
+                    col = Theme.TEXT_DIM();
+                }
                 g2.setColor(col);
-                int d = 7;
-                g2.fillOval((getWidth()-d)/2, (getHeight()-d)/2, d, d);
+                int dotSize = isPast && hasWork ? 8 : 7;
+                g2.fillOval((getWidth()-dotSize)/2, (getHeight()-dotSize)/2, dotSize, dotSize);
                 g2.dispose();
             }
         };
@@ -746,7 +785,8 @@ public class GymApp extends JFrame {
     }
 
     private JPanel buildRestDayCard() {
-        RoundedPanel card = new RoundedPanel(15, new Color(50, 40, 70));
+        Color restBg = Theme.isDark() ? new Color(50, 40, 80) : new Color(220, 240, 228);
+        RoundedPanel card = new RoundedPanel(15, restBg);
         card.setLayout(new BorderLayout(10, 0));
         card.setMaximumSize(new Dimension(9999, Scale.dp(58))); card.setPreferredSize(new Dimension(440, Scale.dp(58)));
         card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
@@ -772,7 +812,8 @@ public class GymApp extends JFrame {
         card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(8), Scale.dp(14), Scale.dp(8), Scale.dp(14)));
         card.add(transparentLabel("Mark as Rest Day", SwingConstants.LEFT, Theme.BODY, Theme.TEXT_MUTED()), BorderLayout.WEST);
         RoundedButton btn = new RoundedButton("Set Rest Day", 8);
-        btn.setBackground(new Color(80, 60, 110)); btn.setForeground(Color.WHITE);
+        btn.setBackground(Theme.isDark() ? new Color(80, 60, 110) : new Color(60, 140, 100));
+        btn.setForeground(Color.WHITE);
         btn.setPreferredSize(new Dimension(100, 28));
         btn.addActionListener(e -> {
             restDays.add(currentSelectedDate.getDayOfWeek());
@@ -859,24 +900,31 @@ public class GymApp extends JFrame {
         });
         handle.addMouseMotionListener(new MouseAdapter() {
             @Override public void mouseDragged(MouseEvent e) {
-                if (dragFromIndex < 0) return;
-                int curY = SwingUtilities.convertPoint(handle, e.getPoint(), exerciseListPanel).y;
+                if (dragFromIndex < 0 || logs.size() < 2) return;
+                int curY  = SwingUtilities.convertPoint(handle, e.getPoint(), exerciseListPanel).y;
                 int cardH = Scale.dp(55) + Scale.dp(8);
-                int toIdx = Math.max(0, Math.min(logs.size()-1, curY / Math.max(1, cardH)));
-                if (toIdx != dragFromIndex) {
-                    ExerciseData from = logs.get(dragFromIndex);
-                    ExerciseData to   = logs.get(toIdx);
-                    int fi = masterExercises.indexOf(from);
-                    int ti = masterExercises.indexOf(to);
-                    if (fi >= 0 && ti >= 0) {
-                        masterExercises.set(fi, to);
-                        masterExercises.set(ti, from);
-                        dragFromIndex = toIdx;
-                        fromIdx[0]    = toIdx;
-                        refreshExerciseListUI();
-                        save();
-                    }
-                }
+                int toIdx = Math.max(0, Math.min(logs.size() - 1, curY / Math.max(1, cardH)));
+                if (toIdx == dragFromIndex) return;
+
+                // Move in masterExercises: find the real objects and do an insert-remove
+                ExerciseData moving = logs.get(dragFromIndex);
+                int masterFrom = masterExercises.indexOf(moving);
+                ExerciseData target = logs.get(toIdx);
+                int masterTo   = masterExercises.indexOf(target);
+                if (masterFrom < 0 || masterTo < 0) return;
+
+                masterExercises.remove(masterFrom);
+                // Re-find insert position after removal
+                int insertAt = masterExercises.indexOf(target);
+                if (insertAt < 0) insertAt = masterTo < masterFrom ? masterTo : masterTo - 1;
+                if (toIdx > dragFromIndex) insertAt = Math.min(masterExercises.size(), insertAt + 1);
+                masterExercises.add(Math.max(0, Math.min(masterExercises.size(), insertAt)), moving);
+
+                fromIdx[0]    = toIdx;
+                dragFromIndex = toIdx;
+                invalidateExerciseCache();
+                refreshExerciseListUI();
+                save();
             }
         });
     }
@@ -1072,23 +1120,36 @@ public class GymApp extends JFrame {
 
     private void refreshExerciseChoices() {
         Object prev = historyExerciseSelect.getSelectedItem();
-        Set<String> names = new LinkedHashSet<>();
+        // Collect all exercise names from completion logs
+        Set<String> completedNames = new LinkedHashSet<>();
         for (ArrayList<ExerciseData> logs : datedWorkoutLogs.values())
-            for (ExerciseData d : logs) names.add(d.getName());
+            for (ExerciseData d : logs) completedNames.add(d.getName());
+        // Mark which names still exist in the active routine
+        Set<String> activeNames = new LinkedHashSet<>();
+        for (ExerciseData ex : masterExercises) activeNames.add(ex.getName());
         historyExerciseSelect.removeAllItems();
-        for (String name : names) historyExerciseSelect.addItem(name);
+        for (String name : completedNames) {
+            // Append (deleted) tag if exercise no longer in active routine
+            String display = activeNames.contains(name) ? name : name + "  (deleted)";
+            historyExerciseSelect.addItem(display);
+        }
         if (prev != null) historyExerciseSelect.setSelectedItem(prev);
     }
 
     private void updateHistoryChart() {
         if (historyChart == null || historyExerciseSelect.getSelectedItem() == null) {
-            if (historyChart != null) historyChart.setData(new ArrayList<>(), new ArrayList<>(), "Completed exercise");
+            if (historyChart != null) historyChart.setData(new ArrayList<>(), new ArrayList<>(), "Completed exercise", false);
             return;
         }
-        String exercise = historyExerciseSelect.getSelectedItem().toString();
+        // Strip the (deleted) tag if present before matching exercise names
+        String exercise = historyExerciseSelect.getSelectedItem().toString()
+                .replaceAll("\\s*\\(deleted\\)\\s*$", "").trim();
         LocalDate today = LocalDate.now();
         List<Double> values = new ArrayList<>();
         List<String> labels = new ArrayList<>();
+        boolean isBW = masterExercises.stream()
+                .filter(ex -> ex.getName().equals(exercise))
+                .findFirst().map(this::isBodyweightExercise).orElse(false);
         for (int i = 13; i >= 0; i--) {
             LocalDate date = today.minusDays(i);
             double total = datedWorkoutLogs.getOrDefault(date, new ArrayList<>())
@@ -1097,18 +1158,27 @@ public class GymApp extends JFrame {
             values.add(total);
             labels.add(date.format(DateTimeFormatter.ofPattern("dd")));
         }
-        historyChart.setData(values, labels, exercise);
+        historyChart.setData(values, labels, exercise, isBW);
     }
+
+    private JLabel lastWeighedLabel;
 
     private JPanel createBodyScreen() {
         AppScreen screen = createScreenShell("Body", "body");
         JPanel center = new JPanel(new BorderLayout(0, 10)); center.setOpaque(false);
         RoundedPanel heightBox = new RoundedPanel(16, Theme.PANEL_DARK());
-        heightBox.setLayout(new BorderLayout());
-        heightBox.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
-        heightBox.setPreferredSize(new Dimension(420, 58));
-        heightBox.add(transparentLabel("Height", SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()), BorderLayout.WEST);
-        heightSummaryButton = new RoundedButton(heightCm > 0 ? String.format("%.0f cm", heightCm) : "Set height", 10);
+        heightBox.setLayout(new BorderLayout(8, 0));
+        heightBox.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
+        heightBox.setPreferredSize(new Dimension(420, 62));
+
+        JPanel heightLeft = new JPanel(); heightLeft.setLayout(new BoxLayout(heightLeft, BoxLayout.Y_AXIS)); heightLeft.setOpaque(false);
+        heightLeft.add(transparentLabel("Height", SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()));
+        lastWeighedLabel = new JLabel("No entries yet");
+        lastWeighedLabel.setFont(Theme.small()); lastWeighedLabel.setForeground(Theme.TEXT_MUTED()); lastWeighedLabel.setOpaque(false);
+        heightLeft.add(lastWeighedLabel);
+        heightBox.add(heightLeft, BorderLayout.WEST);
+
+        heightSummaryButton = new RoundedButton(heightCm > 0 ? String.format("%.1f cm", heightCm) : "Set height", 10);
         heightSummaryButton.setBackground(Theme.ACCENT); heightSummaryButton.setForeground(Color.WHITE);
         heightSummaryButton.setPreferredSize(new Dimension(112, 30));
         heightSummaryButton.addActionListener(e -> setHeightDialog());
@@ -1129,7 +1199,17 @@ public class GymApp extends JFrame {
         bodyEntries.sort(Comparator.comparing(BodyWeightEntry::getDate));
         bodyChart.setData(bodyEntries);
         if (heightSummaryButton != null)
-            heightSummaryButton.setText(heightCm > 0 ? String.format("%.0f cm", heightCm) : "Set height");
+            heightSummaryButton.setText(heightCm > 0 ? String.format("%.1f cm", heightCm) : "Set height");
+        if (lastWeighedLabel != null) {
+            if (bodyEntries.isEmpty()) {
+                lastWeighedLabel.setText("No entries yet");
+            } else {
+                BodyWeightEntry latest = bodyEntries.get(bodyEntries.size() - 1);
+                long daysAgo = java.time.temporal.ChronoUnit.DAYS.between(latest.getDate(), LocalDate.now());
+                String ago = daysAgo == 0 ? "today" : daysAgo == 1 ? "yesterday" : daysAgo + " days ago";
+                lastWeighedLabel.setText(String.format("Last: %.1f kg  (%s)", latest.getWeightKg(), ago));
+            }
+        }
         bodyLogPanel.removeAll();
         double hm = heightCm / 100.0;
         List<BodyWeightEntry> reversed = new ArrayList<>(bodyEntries);
@@ -1160,17 +1240,66 @@ public class GymApp extends JFrame {
 
     private JPanel createCardioScreen() {
         AppScreen screen = createScreenShell("Cardio", "cardio");
-        JPanel center = new JPanel(new BorderLayout(0, 10)); center.setOpaque(false);
-        JLabel hdr = transparentLabel("Cardio Log", SwingConstants.LEFT, Theme.HEADER_FONT, Theme.TEXT());
-        hdr.setBorder(BorderFactory.createEmptyBorder(10, 0, 4, 0));
-        center.add(hdr, BorderLayout.NORTH);
+        JPanel center = new JPanel(new BorderLayout(0, 8)); center.setOpaque(false);
+
+        RoundedPanel statsBox = new RoundedPanel(14, Theme.PANEL_DARK());
+        statsBox.setLayout(new GridLayout(1, 3, 0, 0));
+        statsBox.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        statsBox.setPreferredSize(new Dimension(440, 58));
+        statsBox.setMaximumSize(new Dimension(9999, 58));
+        statsBox.add(buildCardioStatCell("This week", "\u2014"));
+        statsBox.add(buildCardioStatCell("Total sessions", "\u2014"));
+        statsBox.add(buildCardioStatCell("Best pace", "\u2014"));
+        center.add(statsBox, BorderLayout.NORTH);
+
         cardioLogPanel = new JPanel(); cardioLogPanel.setLayout(new BoxLayout(cardioLogPanel, BoxLayout.Y_AXIS)); cardioLogPanel.setOpaque(false);
         JScrollPane scroll = new JScrollPane(cardioLogPanel);
         styleScroll(scroll); enableVerticalDragScroll(scroll);
         center.add(scroll, BorderLayout.CENTER);
         screen.add(center, BorderLayout.CENTER);
-        screen.setNavigateHook(this::refreshCardioUI);
+        screen.setNavigateHook(() -> { refreshCardioStats(statsBox); refreshCardioUI(); });
         return screen;
+    }
+
+    private JPanel buildCardioStatCell(String label, String value) {
+        JPanel cell = new JPanel(); cell.setLayout(new BoxLayout(cell, BoxLayout.Y_AXIS)); cell.setOpaque(false);
+        JLabel lbl = transparentLabel(label, SwingConstants.CENTER, Theme.TINY, Theme.TEXT_MUTED());
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel val = transparentLabel(value, SwingConstants.CENTER, Theme.BODY_BOLD, Theme.ACCENT);
+        val.setAlignmentX(Component.CENTER_ALIGNMENT);
+        cell.add(Box.createRigidArea(new Dimension(0, 2)));
+        cell.add(lbl); cell.add(Box.createRigidArea(new Dimension(0, 3))); cell.add(val);
+        return cell;
+    }
+
+    private void refreshCardioStats(RoundedPanel statsBox) {
+        if (statsBox == null || cardioEntries == null) return;
+        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        double weekDist = cardioEntries.stream()
+                .filter(e -> !e.getDate().isBefore(weekStart))
+                .mapToDouble(CardioEntry::getDistanceKm).sum();
+        int totalSessions = cardioEntries.size();
+        double bestPace = cardioEntries.stream()
+                .filter(e -> e.getDistanceKm() > 0 && e.getDurationMinutes() > 0)
+                .mapToDouble(CardioEntry::getPaceMinPerKm)
+                .min().orElse(0);
+        Component[] cells = statsBox.getComponents();
+        updateStatCell(cells, 0, "This week", weekDist > 0 ? String.format("%.1f km", weekDist) : "—");
+        updateStatCell(cells, 1, "Total sessions", String.valueOf(totalSessions));
+        updateStatCell(cells, 2, "Best pace", bestPace > 0 ? String.format("%.1f min/km", bestPace) : "—");
+        statsBox.revalidate(); statsBox.repaint();
+    }
+
+    private void updateStatCell(Component[] cells, int idx, String label, String value) {
+        if (idx >= cells.length || !(cells[idx] instanceof JPanel)) return;
+        JPanel cell = (JPanel) cells[idx];
+        Component[] sub = cell.getComponents();
+        for (Component c : sub) {
+            if (c instanceof JLabel) {
+                JLabel lbl = (JLabel) c;
+                if (lbl.getForeground().equals(Theme.ACCENT)) lbl.setText(value);
+            }
+        }
     }
 
     private void refreshCardioUI() {
@@ -1309,14 +1438,21 @@ public class GymApp extends JFrame {
 
         Map<DayOfWeek, List<ExerciseData>> byDay = new LinkedHashMap<>();
         for (DayOfWeek d : DayOfWeek.values()) byDay.put(d, new ArrayList<>());
-        for (ExerciseData ex : masterExercises) byDay.get(ex.getDayOfWeek()).add(ex);
+        for (ExerciseData ex : masterExercises) {
+            // Skip exercises on days marked as rest days
+            if (!restDays.contains(ex.getDayOfWeek())) byDay.get(ex.getDayOfWeek()).add(ex);
+        }
+
+        // Build list of active (non-rest) exercises only
+        List<ExerciseData> activeExercises = new ArrayList<>();
+        for (List<ExerciseData> dayList : byDay.values()) activeExercises.addAll(dayList);
 
         Map<String,Integer> setsByCat   = new HashMap<>();
         Map<String,Double>  volByCat    = new HashMap<>();
         int totalSets=0; double totalVol=0; int shortRest=0; int longRest=0;
         int trainingDays=0; double avgRestBetweenSets=0; int restCount=0;
 
-        for (ExerciseData d : masterExercises) {
+        for (ExerciseData d : activeExercises) {
             String cat = classifyExercise(d.getName());
             int sets = getTargetSets(d); double vol = estimateVolume(d);
             setsByCat.merge(cat,sets,Integer::sum); volByCat.merge(cat,vol,Double::sum);
@@ -1326,6 +1462,10 @@ public class GymApp extends JFrame {
             if (d.getRestSeconds()>180) longRest++;
         }
         for (List<ExerciseData> day : byDay.values()) if (!day.isEmpty()) trainingDays++;
+        if (activeExercises.isEmpty()) {
+            assessorFeedback.setText("No active exercises found (all scheduled days may be rest days).");
+            return;
+        }
         if (restCount>0) avgRestBetweenSets/=restCount;
 
         int push=setsByCat.getOrDefault("Push",0), pull=setsByCat.getOrDefault("Pull",0),
@@ -1459,6 +1599,34 @@ public class GymApp extends JFrame {
                 refreshWorkoutScreen(); save();
                 JOptionPane.showMessageDialog(GymApp.this, "Cleared.");
             }
+        }));
+        center.add(Box.createRigidArea(new Dimension(0, 8)));
+        center.add(buildSettingsActionRow("\u274C  Clear ALL Data", "Wipe everything and start fresh", Theme.DANGER, () -> {
+            int confirm = JOptionPane.showConfirmDialog(GymApp.this,
+                "This will permanently delete ALL exercises, logs, PRs, body entries, cardio sessions and macros.\n\nAre you absolutely sure?",
+                "Clear All Data", JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) return;
+            int confirm2 = JOptionPane.showConfirmDialog(GymApp.this,
+                "Last chance — this cannot be undone. Delete everything?",
+                "Final Confirmation", JOptionPane.YES_NO_OPTION);
+            if (confirm2 != JOptionPane.YES_OPTION) return;
+            masterExercises.clear(); datedWorkoutLogs.clear(); loggedSetsByDate.clear();
+            personalRecords.clear(); bodyEntries.clear(); cardioEntries.clear(); restDays.clear();
+            Arrays.fill(macroGoalValues, ""); Arrays.fill(macroCurrentValues, "");
+            invalidateExerciseCache();
+            refreshWorkoutScreen();
+            refreshMacroCards();
+            refreshRecordCards();
+            refreshBodyUI();
+            refreshCardioUI();
+            // Delete the data files
+            java.nio.file.Path dir = java.nio.file.Paths.get(System.getProperty("user.home"), ".ironpulse");
+            try {
+                java.nio.file.Files.walk(dir)
+                    .filter(p -> p.toString().endsWith(".csv"))
+                    .forEach(p -> { try { java.nio.file.Files.delete(p); } catch (Exception ignored) {} });
+            } catch (Exception ignored) {}
+            JOptionPane.showMessageDialog(GymApp.this, "All data cleared. Fresh start!");
         }));
         center.add(Box.createRigidArea(new Dimension(0, 8)));
         center.add(buildSettingsInfoRow("\uD83D\uDCC1  Location", "~/.ironpulse/"));
@@ -1737,7 +1905,7 @@ public class GymApp extends JFrame {
 
     private void editExerciseDialog(ExerciseData data) {
         String[] parts = data.getReps()==null ? new String[]{"3","10"} : data.getReps().split("x");
-        JTextField weightField = new JTextField(data.getWeight());
+        JTextField weightField = new JTextField(data.isBodyweight() ? "BW" : data.getWeight());
         JTextField setsField   = new JTextField(parts.length>0?parts[0]:"3");
         JTextField repsField   = new JTextField(parts.length>1?parts[1]:"10");
         JTextField restField   = new JTextField(String.valueOf(data.getRestSeconds()));
@@ -1779,15 +1947,35 @@ public class GymApp extends JFrame {
     }
 
     private void addBodyEntryDialog() {
-        JTextField dateField=new JTextField(LocalDate.now().toString()), weightField=new JTextField();
+        // Prompt to set height first if not set
+        if (heightCm <= 0) {
+            int prompt = JOptionPane.showConfirmDialog(this,
+                "Height not set — BMI won't be calculated.\nSet height now?",
+                "Height Not Set", JOptionPane.YES_NO_OPTION);
+            if (prompt == JOptionPane.YES_OPTION) setHeightDialog();
+        }
+        JTextField dateField   = new JTextField(LocalDate.now().toString());
+        JTextField weightField = new JTextField();
         if (JOptionPane.showConfirmDialog(this,
                 new Object[]{"Date (YYYY-MM-DD):", dateField, "Bodyweight (kg or lbs):", weightField},
-                "Add Bodyweight", JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION) {
+                "Add Bodyweight", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             try {
-                bodyEntries.add(new BodyWeightEntry(LocalDate.parse(dateField.getText().trim()),
-                        Double.parseDouble(weightField.getText().trim())));
+                LocalDate entryDate = LocalDate.parse(dateField.getText().trim());
+                double    entryWt   = Double.parseDouble(weightField.getText().trim());
+                // Check for duplicate date
+                boolean duplicate = bodyEntries.stream().anyMatch(e -> e.getDate().equals(entryDate));
+                if (duplicate) {
+                    int confirm = JOptionPane.showConfirmDialog(this,
+                        "An entry for " + entryDate + " already exists. Replace it?",
+                        "Duplicate Date", JOptionPane.YES_NO_OPTION);
+                    if (confirm != JOptionPane.YES_OPTION) return;
+                    bodyEntries.removeIf(e -> e.getDate().equals(entryDate));
+                }
+                bodyEntries.add(new BodyWeightEntry(entryDate, entryWt));
                 refreshBodyUI(); save();
-            } catch (RuntimeException ex) { JOptionPane.showMessageDialog(this,"Enter a valid date and number."); }
+            } catch (RuntimeException ex) {
+                JOptionPane.showMessageDialog(this, "Enter a valid date (YYYY-MM-DD) and a number for weight.");
+            }
         }
     }
 
@@ -1839,8 +2027,14 @@ public class GymApp extends JFrame {
     }
 
     private void removeExerciseFromAllCompletedDates(ExerciseData data) {
-        datedWorkoutLogs.values().forEach(l->l.remove(data));
-        loggedSetsByDate.values().forEach(m->m.remove(data));
+        // Remove by reference (works for current session)
+        datedWorkoutLogs.values().forEach(l -> l.remove(data));
+        loggedSetsByDate.values().forEach(m -> m.remove(data));
+        // Also remove by name+addedDate to catch entries restored from disk
+        String name  = data.getName();
+        LocalDate ad = data.getAddedDate();
+        datedWorkoutLogs.values().forEach(l ->
+            l.removeIf(ex -> ex.getName().equals(name) && ex.getAddedDate().equals(ad)));
     }
 
     private int getTargetSets(ExerciseData data) {
@@ -1857,13 +2051,17 @@ public class GymApp extends JFrame {
         loggedSetsByDate.computeIfAbsent(currentSelectedDate, d->new HashMap<>()).put(data,sets);
     }
 
+    private boolean isBodyweightExercise(ExerciseData data) {
+        return data.isBodyweight();
+    }
+
     private double estimateVolume(ExerciseData data) {
-        double weight=parseFirstNumber(data.getWeight());
-        String[] parts=data.getReps()==null?new String[0]:data.getReps().toLowerCase().split("x");
-        double sets=parts.length>1?parseFirstNumber(parts[0]):1;
-        double reps=parts.length>1?parseFirstNumber(parts[1]):parseFirstNumber(data.getReps());
-        if (weight<=0) return Math.max(1,sets)*Math.max(1,reps);
-        return weight*Math.max(1,sets)*Math.max(1,reps);
+        String[] parts = data.getReps()==null ? new String[0] : data.getReps().toLowerCase().split("x");
+        double sets = Math.max(1, parts.length>1 ? parseFirstNumber(parts[0]) : 1);
+        double reps = Math.max(1, parts.length>1 ? parseFirstNumber(parts[1]) : parseFirstNumber(data.getReps()));
+        if (data.isBodyweight()) return sets * reps;
+        double w = data.getWeightKg();
+        return w > 0 ? w * sets * reps : sets * reps;
     }
 
     private String classifyExercise(String name) {
@@ -1889,19 +2087,33 @@ public class GymApp extends JFrame {
         return formatWeight(data)+" | "+reps+" | "+data.getRestSeconds()+"s";
     }
 
-    /** Strips all non-numeric characters except decimal point, returns just the number string. */
+    /**
+     * Normalises a weight string to a plain decimal number.
+     * Handles: "82.5 kg", "82.5kg", "82,5 kg" (European), "BW"/"bodyweight" (returns "").
+     * Shows a warning if the input looks like a number but uses comma as decimal.
+     */
     private String normaliseWeight(String raw) {
         if (raw == null || raw.trim().isEmpty()) return "";
-        // Remove unit suffixes and whitespace, keep only digits and dot
-        String stripped = raw.trim().replaceAll("(?i)\\s*(kg|lbs|lb|kgs)\\s*", "").replaceAll("[^0-9.]", "").trim();
-        return stripped.isEmpty() ? "" : stripped;
+        String t = raw.trim();
+        // Bodyweight keywords — store as empty
+        if (t.equalsIgnoreCase("bw") || t.equalsIgnoreCase("bodyweight")) return "";
+        // Strip known unit suffixes (case-insensitive, with optional space)
+        t = t.replaceAll("(?i)\\s*(kgs?|lbs?|pounds?)\\s*$", "").trim();
+        // Convert European comma decimal to dot (e.g. "82,5" -> "82.5")
+        if (t.matches("\\d+,\\d+")) t = t.replace(",", ".");
+        // Keep only digits and at most one decimal point
+        t = t.replaceAll("[^0-9.]", "").trim();
+        // Remove extra dots (keep only the first)
+        int firstDot = t.indexOf('.');
+        if (firstDot >= 0) t = t.substring(0, firstDot + 1) + t.substring(firstDot + 1).replace(".", "");
+        return t.isEmpty() ? "" : t;
     }
 
     private String formatWeight(ExerciseData data) {
-        String w = data.getWeight();
-        if (w == null || w.trim().isEmpty()) return "–";
-        // Already normalised to a plain number; display with kg
-        return w.trim() + " kg";
+        if (data.isBodyweight()) return "Bodyweight";
+        double w = data.getWeightKg();
+        if (w <= 0) return "–";
+        return (w == Math.floor(w)) ? ((int)w) + " kg" : w + " kg";
     }
 
     private void addSectionLabel(JPanel container, String text) {
@@ -1910,10 +2122,18 @@ public class GymApp extends JFrame {
         container.add(label); container.add(Box.createRigidArea(new Dimension(0,8)));
     }
 
+    /** Strips unit suffixes from macro values — keeps only the numeric part. */
+    private String normaliseMacroValue(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return "";
+        // Remove common unit suffixes, keep number
+        return raw.trim().replaceAll("(?i)\\s*(kcal|cal|calories|g|grams|gram)\\s*$", "").trim();
+    }
+
     private void addStatCards(JPanel container, String[] labels, String[] values, boolean editMode) {
         for (int i=0; i<labels.length; i++) {
             final int idx=i;
-            container.add(new StatCardPanel(labels[idx],values[idx],editMode,v->values[idx]=v));
+            container.add(new StatCardPanel(labels[idx], values[idx], editMode,
+                    v -> values[idx] = normaliseMacroValue(v)));
             container.add(Box.createRigidArea(new Dimension(0,10)));
         }
     }
@@ -2055,6 +2275,18 @@ public class GymApp extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new GymApp().setVisible(true));
+        SwingUtilities.invokeLater(() -> {
+            GymApp app = new GymApp();
+            app.setVisible(true);
+            // Re-initialise Scale with the actual rendered content pane size
+            SwingUtilities.invokeLater(() -> {
+                int w = app.getContentPane().getWidth();
+                int h = app.getContentPane().getHeight();
+                if (w > 0 && h > 0) {
+                    Scale.init(w, h);
+                    SwingUtilities.updateComponentTreeUI(app);
+                }
+            });
+        });
     }
 }

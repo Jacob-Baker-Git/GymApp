@@ -172,11 +172,37 @@ public final class DataStore {
         return rows;
     }
 
+    /**
+     * Encodes a string for safe CSV storage.
+     * Replaces commas, pipes, newlines, carriage returns, and backslashes
+     * using backslash-escape so any text can round-trip safely.
+     */
     private static String escape(String s) {
-        return s == null ? "" : s.replace(",", "&#44;").replace("\n", " ");
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")   // \ -> \\
+                .replace(",",    "\\,")       // ,  -> \,
+                .replace("|",    "\\p")       // |  -> \p  (safe for template parsing)
+                .replace("\r",  "")            // strip CR
+                .replace("\n",  "\\n");      // newline -> \n
     }
 
     private static String unescape(String s) {
-        return s == null ? "" : s.replace("&#44;", ",");
+        if (s == null) return "";
+        // Process escape sequences in order (longest first to avoid double-processing)
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        while (i < s.length()) {
+            if (s.charAt(i) == '\\' && i + 1 < s.length()) {
+                char next = s.charAt(i + 1);
+                if      (next == '\\') { sb.append('\\'); i += 2; }
+                else if (next == ',')  { sb.append(',');  i += 2; }
+                else if (next == 'p')  { sb.append('|');  i += 2; }
+                else if (next == 'n')  { sb.append('\n'); i += 2; }
+                else                   { sb.append(s.charAt(i)); i++; }
+            } else {
+                sb.append(s.charAt(i++));
+            }
+        }
+        return sb.toString();
     }
 }

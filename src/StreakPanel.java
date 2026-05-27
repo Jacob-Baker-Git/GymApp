@@ -108,9 +108,20 @@ public class StreakPanel extends JPanel {
         g2.setColor(Theme.PANEL_MID());
         g2.fillRoundRect(barX, barY, barW, barH, barH, barH);
         if (streak > 0) {
-            double ratio = Math.min(1.0, streak / 30.0);
-            int filled = Math.max(barH, (int)(ratio * barW));
-            g2.setPaint(new GradientPaint(barX, 0, Theme.ACCENT_DARK, barX + filled, 0, Theme.ACCENT));
+            // Bar fills based on a rolling window: 0–30 days normal, 30–90 gold, 90+ red
+            int milestone = streak < 30 ? 30 : streak < 90 ? 90 : 365;
+            int prev      = streak < 30 ? 0  : streak < 90 ? 30  : 90;
+            double ratio  = Math.min(1.0, (double)(streak - prev) / (milestone - prev));
+            int filled    = Math.max(barH, (int)(ratio * barW));
+            Color barCol1, barCol2;
+            if (streak < 30) {
+                barCol1 = Theme.ACCENT_DARK; barCol2 = Theme.ACCENT;
+            } else if (streak < 90) {
+                barCol1 = new Color(200, 130, 0); barCol2 = Theme.ACCENT_2;
+            } else {
+                barCol1 = new Color(180, 30, 30); barCol2 = new Color(240, 80, 60);
+            }
+            g2.setPaint(new GradientPaint(barX, 0, barCol1, barX + filled, 0, barCol2));
             g2.fillRoundRect(barX, barY, filled, barH, barH, barH);
         }
 

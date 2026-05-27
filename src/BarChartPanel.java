@@ -12,16 +12,18 @@ public class BarChartPanel extends JPanel {
     private List<Double> values = new ArrayList<>();
     private List<String> labels = new ArrayList<>();
     private String       title  = "Volume";
+    private boolean      isBW   = false;
 
     public BarChartPanel() {
         setOpaque(false);
         setPreferredSize(new java.awt.Dimension(420, 300));
     }
 
-    public void setData(List<Double> values, List<String> labels, String title) {
+    public void setData(List<Double> values, List<String> labels, String title, boolean isBW) {
         this.values = new ArrayList<>(values);
         this.labels = new ArrayList<>(labels);
         this.title  = title;
+        this.isBW   = isBW;
         repaint();
     }
 
@@ -44,7 +46,7 @@ public class BarChartPanel extends JPanel {
         // Title
         g2.setFont(Theme.BODY_BOLD);
         g2.setColor(Theme.TEXT());
-        g2.drawString(title + "  —  past 2 weeks", 16, 28);
+        g2.drawString(title + (isBW ? " (bodyweight — showing reps)" : "  —  past 2 weeks"), 16, 28);
 
         if (values.isEmpty()) {
             g2.setFont(Theme.BODY); g2.setColor(Theme.TEXT_MUTED());
@@ -69,9 +71,9 @@ public class BarChartPanel extends JPanel {
         for (int i = 0; i <= gridN; i++) {
             int    y   = PAD_TOP + chartH * i / gridN;
             double val = max * (gridN - i) / gridN;
-            String lbl = val >= 1000 ? String.format("%.1fk", val/1000)
+            String lbl = isBW ? (i==0?"reps":"") : (val >= 1000 ? String.format("%.1fk", val/1000)
                        : val > 0     ? String.format("%.0f",   val)
-                       : "0";
+                       : "0");
             g2.setColor(Theme.TEXT_MUTED());
             g2.drawString(lbl, PAD_LEFT - fm.stringWidth(lbl) - 5, y + fm.getAscent()/2 - 1);
 
