@@ -41,24 +41,31 @@ public class RoundedButton extends JButton {
         int    inset = glowing ? 3 : 1;
         double w     = getWidth()  - inset * 2.0;
         double h     = getHeight() - inset * 2.0;
-        Color  bg    = hovering ? Theme.shift(getBackground(), 16) : getBackground();
+        int    cr    = Scale.dp(radius);
+        Color  bg    = hovering ? Theme.shift(getBackground(), Theme.isDark() ? 18 : -10) : getBackground();
 
-        g2.setColor(new Color(0, 0, 0, 55));
-        g2.fill(new RoundRectangle2D.Double(inset + 1, inset + 4, w - 2, h - 3, radius, radius));
+        // Shadow
+        int shadowAlpha = Theme.isDark() ? 50 : 18;
+        g2.setColor(new Color(0, 0, 0, shadowAlpha));
+        g2.fill(new RoundRectangle2D.Double(inset + 1, inset + 3, w - 2, h - 2, cr, cr));
 
+        // Body
         g2.setPaint(Theme.verticalGradient(bg, getWidth(), getHeight()));
-        g2.fill(new RoundRectangle2D.Double(inset, inset, w, h, radius, radius));
+        g2.fill(new RoundRectangle2D.Double(inset, inset, w, h, cr, cr));
 
-        g2.setColor(new Color(255, 255, 255, hovering ? 45 : 24));
-        g2.setStroke(new BasicStroke(1));
-        g2.draw(new RoundRectangle2D.Double(inset + 0.5, inset + 0.5, w - 1, h - 1, radius, radius));
+        // Rim highlight
+        int rimAlpha = Theme.isDark() ? (hovering ? 40 : 20) : (hovering ? 60 : 30);
+        g2.setColor(new Color(255, 255, 255, rimAlpha));
+        g2.setStroke(new BasicStroke(1f));
+        g2.draw(new RoundRectangle2D.Double(inset + 0.5, inset + 0.5, w - 1, h - 1, cr, cr));
 
         if (glowing) {
             g2.setColor(Theme.ACCENT_GLOW);
-            g2.setStroke(new BasicStroke(2.2f));
-            g2.draw(new RoundRectangle2D.Double(2, 2, getWidth() - 4.0, getHeight() - 4.0, radius, radius));
+            g2.setStroke(new BasicStroke(2f));
+            g2.draw(new RoundRectangle2D.Double(1.5, 1.5, getWidth() - 3.0, getHeight() - 3.0, cr, cr));
         }
 
+        // Label
         g2.setColor(getForeground());
         g2.setFont(getFont());
         FontMetrics fm = g2.getFontMetrics();

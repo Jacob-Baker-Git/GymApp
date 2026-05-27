@@ -2,7 +2,6 @@ import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -14,15 +13,16 @@ import java.util.function.Consumer;
 public class StatCardPanel extends RoundedPanel {
 
     public StatCardPanel(String label, String value, boolean editMode, Consumer<String> onValueChanged) {
-        super(15, Theme.CARD_BG());
+        super(14, Theme.CARD_BG());
         setLayout(new BorderLayout());
-        setMaximumSize(new Dimension(440, 55));
-        setPreferredSize(new Dimension(440, 55));
-        setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        setMaximumSize(new Dimension(9999, Scale.dp(56)));
+        setPreferredSize(new Dimension(440, Scale.dp(56)));
+        setBorder(BorderFactory.createEmptyBorder(Scale.dp(9), Scale.dp(14), Scale.dp(9), Scale.dp(14)));
 
         JLabel titleLabel = new JLabel(label);
-        titleLabel.setFont(Theme.BODY_BOLD);
+        titleLabel.setFont(Theme.bodyBold());
         titleLabel.setForeground(Theme.TEXT());
+        titleLabel.setOpaque(false);
         add(titleLabel, BorderLayout.WEST);
 
         if (editMode) {
@@ -30,8 +30,10 @@ public class StatCardPanel extends RoundedPanel {
             editField.setBackground(Theme.FIELD_BG());
             editField.setForeground(Theme.TEXT());
             editField.setCaretColor(Theme.TEXT());
-            editField.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
-            editField.setPreferredSize(new Dimension(125, 28));
+            editField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Theme.BORDER(), 1, true),
+                BorderFactory.createEmptyBorder(2, 8, 2, 8)));
+            editField.setPreferredSize(new Dimension(Scale.dp(130), Scale.dp(30)));
             editField.addActionListener(e -> onValueChanged.accept(editField.getText().trim()));
             editField.addFocusListener(new FocusAdapter() {
                 @Override public void focusLost(FocusEvent e) {
@@ -42,8 +44,9 @@ public class StatCardPanel extends RoundedPanel {
         } else {
             String display = (value == null || value.trim().isEmpty()) ? "Tap edit" : value;
             JLabel valueLabel = new JLabel(display);
-            valueLabel.setFont(Theme.BODY);
+            valueLabel.setFont(Theme.body());
             valueLabel.setForeground(Theme.TEXT_MUTED());
+            valueLabel.setOpaque(false);
             add(valueLabel, BorderLayout.EAST);
         }
     }
@@ -53,8 +56,9 @@ public class StatCardPanel extends RoundedPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setPaint(Theme.verticalGradient(Theme.ACCENT_DARK, 6, getHeight()));
-        g2.fillRoundRect(8, 12, 5, getHeight() - 24, 5, 5);
+        // Accent bar on left edge
+        g2.setPaint(Theme.verticalGradient(Theme.ACCENT_DARK, Scale.dp(5), getHeight()));
+        g2.fillRoundRect(Scale.dp(7), Scale.dp(11), Scale.dp(4), getHeight() - Scale.dp(22), Scale.dp(4), Scale.dp(4));
         g2.dispose();
     }
 }

@@ -68,12 +68,78 @@ public class GymApp extends JFrame {
     private int               remainingRestSeconds;
 
     private static final String[][] TEMPLATES = {
-        {"PPL \u2013 Push Day",  "Bench Press|80|4x8|120","Overhead Press|50|4x8|120","Incline DB Press|30|3x10|90","Lateral Raise|12|3x15|60","Tricep Pushdown|25|3x12|60"},
-        {"PPL \u2013 Pull Day",  "Deadlift|100|4x6|180","Barbell Row|70|4x8|120","Lat Pulldown|60|3x10|90","Face Pull|20|3x15|60","Bicep Curl|15|3x12|60"},
-        {"PPL \u2013 Leg Day",   "Squat|90|4x8|180","Romanian Deadlift|70|3x10|120","Leg Press|120|3x12|90","Leg Curl|40|3x12|60","Calf Raise|60|4x15|45"},
-        {"Upper Body",           "Bench Press|80|4x8|120","Barbell Row|70|4x8|120","Overhead Press|50|3x10|90","Lat Pulldown|60|3x10|90","Bicep Curl|15|3x12|60","Tricep Extension|20|3x12|60"},
-        {"Lower Body",           "Squat|90|4x8|180","Romanian Deadlift|70|3x10|120","Leg Press|120|3x12|90","Leg Curl|40|3x12|60","Calf Raise|60|4x15|45"},
-        {"Full Body",            "Squat|80|3x8|120","Bench Press|70|3x8|120","Barbell Row|60|3x8|120","Overhead Press|40|3x10|90","Romanian Deadlift|60|3x10|120"},
+        // PPL — Push
+        {"PPL \u2013 Push",
+            "Barbell Bench Press|60|4x6|180",
+            "Overhead Press|40|3x8|150",
+            "Incline Dumbbell Press|22|3x10|90",
+            "Cable Lateral Raise|8|4x15|45",
+            "Tricep Rope Pushdown|15|3x12|60",
+            "Overhead Tricep Extension|20|3x12|60"},
+        // PPL — Pull
+        {"PPL \u2013 Pull",
+            "Deadlift|80|3x5|240",
+            "Weighted Pull-Up|0|4x6|150",
+            "Seated Cable Row|50|4x8|90",
+            "Lat Pulldown|55|3x10|90",
+            "Face Pull|15|3x15|45",
+            "Dumbbell Hammer Curl|14|3x12|60"},
+        // PPL — Legs
+        {"PPL \u2013 Legs",
+            "Barbell Back Squat|80|4x6|180",
+            "Romanian Deadlift|70|3x8|120",
+            "Leg Press|120|3x12|90",
+            "Walking Lunge|20|3x10|60",
+            "Seated Leg Curl|40|3x12|60",
+            "Standing Calf Raise|60|4x15|45"},
+        // Upper / Lower — Upper
+        {"Upper / Lower \u2013 Upper",
+            "Barbell Bench Press|60|4x6|180",
+            "Barbell Row|60|4x6|180",
+            "Overhead Press|40|3x8|120",
+            "Lat Pulldown|55|3x10|90",
+            "Incline Dumbbell Curl|12|3x12|60",
+            "Tricep Pushdown|15|3x12|60"},
+        // Upper / Lower — Lower
+        {"Upper / Lower \u2013 Lower",
+            "Barbell Back Squat|80|4x6|180",
+            "Romanian Deadlift|70|3x8|120",
+            "Leg Press|120|3x10|90",
+            "Nordic Hamstring Curl|0|3x6|90",
+            "Leg Extension|40|3x15|60",
+            "Seated Calf Raise|50|4x15|45"},
+        // Full Body
+        {"Full Body",
+            "Barbell Back Squat|70|3x5|180",
+            "Barbell Bench Press|55|3x5|180",
+            "Barbell Row|55|3x5|180",
+            "Overhead Press|35|3x8|120",
+            "Romanian Deadlift|60|3x8|120",
+            "Plank|0|3x1|60"},
+        // Bro Split — Chest & Tris
+        {"Bro Split \u2013 Chest & Tris",
+            "Barbell Bench Press|60|4x8|120",
+            "Incline Dumbbell Press|22|3x10|90",
+            "Cable Fly|12|3x12|60",
+            "Dips|0|3x10|90",
+            "Skull Crusher|20|3x12|60",
+            "Tricep Pushdown|15|3x15|45"},
+        // Bro Split — Back & Bis
+        {"Bro Split \u2013 Back & Bis",
+            "Pull-Up|0|4x8|120",
+            "Barbell Row|60|4x8|120",
+            "Lat Pulldown|55|3x10|90",
+            "Cable Row|50|3x10|90",
+            "Barbell Curl|30|3x10|60",
+            "Concentration Curl|10|3x12|45"},
+        // Bro Split — Legs & Shoulders
+        {"Bro Split \u2013 Legs & Shoulders",
+            "Barbell Back Squat|80|4x8|180",
+            "Leg Press|120|3x12|90",
+            "Leg Curl|40|3x12|60",
+            "Overhead Press|40|4x8|120",
+            "Lateral Raise|10|4x15|45",
+            "Rear Delt Fly|8|3x15|45"},
     };
 
     public GymApp() {
@@ -82,9 +148,22 @@ public class GymApp extends JFrame {
 
         setTitle("IronPulse Gym Tracker");
         setIconImage(createAppIcon());
-        setSize(480, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // Responsive: use 40% of screen width, capped at 520px, min 360px
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        int winW = Math.max(360, Math.min(520, (int)(screen.width  * 0.40)));
+        int winH = Math.max(640, Math.min(960, (int)(screen.height * 0.88)));
+        setSize(winW, winH);
         setLocationRelativeTo(null);
+        Scale.init(winW, winH);
+
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                Scale.init(getWidth(), getHeight());
+                SwingUtilities.updateComponentTreeUI(GymApp.this);
+            }
+        });
 
         cardLayout     = new CardLayout();
         containerPanel = new JPanel(cardLayout);
@@ -177,7 +256,7 @@ public class GymApp extends JFrame {
     private void initTimelineAndDate() {
         LocalDate today = LocalDate.now();
         currentSelectedDate = today;
-        for (int i = -13; i <= 14; i++) timelineDates.add(today.plusDays(i));
+        for (int i = -7; i <= 21; i++) timelineDates.add(today.plusDays(i));
     }
 
     private Image createAppIcon() {
@@ -214,7 +293,7 @@ public class GymApp extends JFrame {
         AppScreen screen = new AppScreen(new BorderLayout());
         screen.setOpaque(false);
         screen.setBackground(Theme.BG_DARK());
-        screen.setBorder(BorderFactory.createEmptyBorder(18, 20, 12, 20));
+        screen.setBorder(BorderFactory.createEmptyBorder(Scale.dp(14), Scale.dp(16), Scale.dp(10), Scale.dp(16)));
         IconHeader header = new IconHeader(title, iconType);
         header.setOnSettingsClick(() -> navigateTo("SETTINGS"));
         screen.add(header, BorderLayout.NORTH);
@@ -280,14 +359,37 @@ public class GymApp extends JFrame {
     }
 
     private void installMenuDismissListener() {
+        // Use a KeyEventDispatcher + mouse on the root pane for reliable dismiss
+        // The AWTEventListener can miss events in some Swing configs on Windows/Linux
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
+            if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                if (openMenuPanel != null && openMenuPanel.isVisible()) { closeOpenMenu(); return true; }
+            }
+            return false;
+        });
+
+        // Mouse: listen on the layered pane of this window so we catch ALL clicks in the window
+        getRootPane().addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                if (openMenuPanel == null || !openMenuPanel.isVisible()) return;
+                Point pt = SwingUtilities.convertPoint(getRootPane(), e.getPoint(), containerPanel);
+                Component hit = SwingUtilities.getDeepestComponentAt(containerPanel, pt.x, pt.y);
+                boolean inMenu   = hit != null && SwingUtilities.isDescendingFrom(hit, openMenuPanel);
+                boolean inButton = hit != null && openMenuButton != null && SwingUtilities.isDescendingFrom(hit, openMenuButton);
+                if (!inMenu && !inButton) closeOpenMenu();
+            }
+        });
+
+        // Fallback: AWTEventListener for clicks that land on non-Swing areas
         Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
             if (!(event instanceof MouseEvent)) return;
             MouseEvent me = (MouseEvent) event;
             if (me.getID() != MouseEvent.MOUSE_PRESSED) return;
             if (openMenuPanel == null || !openMenuPanel.isVisible()) return;
             Component src = me.getComponent();
-            boolean inMenu   = src != null && SwingUtilities.isDescendingFrom(src, openMenuPanel);
-            boolean inButton = src != null && openMenuButton != null && SwingUtilities.isDescendingFrom(src, openMenuButton);
+            if (src == null) { closeOpenMenu(); return; }
+            boolean inMenu   = SwingUtilities.isDescendingFrom(src, openMenuPanel);
+            boolean inButton = openMenuButton != null && SwingUtilities.isDescendingFrom(src, openMenuButton);
             if (!inMenu && !inButton) closeOpenMenu();
         }, AWTEvent.MOUSE_EVENT_MASK);
     }
@@ -371,7 +473,7 @@ public class GymApp extends JFrame {
     private JPanel createMainWorkoutScreen() {
         AppScreen screen = new AppScreen(new BorderLayout());
         screen.setOpaque(false); screen.setBackground(Theme.BG_DARK());
-        screen.setBorder(BorderFactory.createEmptyBorder(18, 20, 12, 20));
+        screen.setBorder(BorderFactory.createEmptyBorder(Scale.dp(14), Scale.dp(16), Scale.dp(10), Scale.dp(16)));
 
         JPanel fixedTop = new JPanel();
         fixedTop.setOpaque(false);
@@ -450,9 +552,17 @@ public class GymApp extends JFrame {
         if (choice == null) return;
         for (String[] template : TEMPLATES) {
             if (!template[0].equals(choice)) continue;
+            ArrayList<ExerciseData> existing = getExercisesForDate(currentSelectedDate);
+            if (!existing.isEmpty()) {
+                int confirm = JOptionPane.showConfirmDialog(this,
+                    currentSelectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+                    + " already has " + existing.size() + " exercise(s). Add template on top?",
+                    "Day Not Empty", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) return;
+            }
             for (int i = 1; i < template.length; i++) {
                 String[] p = template[i].split("\\|");
-                masterExercises.add(new ExerciseData(p[0], p[1], p[2],
+                masterExercises.add(new ExerciseData(p[0], normaliseWeight(p[1]), p[2],
                         Integer.parseInt(p[3]), currentSelectedDate));
             }
             refreshWorkoutScreen(); save();
@@ -474,7 +584,7 @@ public class GymApp extends JFrame {
         }
 
         JScrollPane scroll = new JScrollPane(calendarPanel);
-        scroll.setPreferredSize(new Dimension(420, 92));
+        scroll.setPreferredSize(new Dimension(9999, Scale.dp(92)));
         scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
         styleScroll(scroll);
@@ -493,8 +603,8 @@ public class GymApp extends JFrame {
         RoundedPanel dayBox = new RoundedPanel(14, Theme.PANEL_DARK());
         dayBox.putClientProperty("date", date);
         dayBox.setLayout(new BoxLayout(dayBox, BoxLayout.Y_AXIS));
-        dayBox.setPreferredSize(new Dimension(62, 80));
-        dayBox.setMaximumSize(new Dimension(62, 80));
+        dayBox.setPreferredSize(Scale.dim(62, 80));
+        dayBox.setMaximumSize(Scale.dim(62, 80));
         dayBox.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
 
         JLabel dayLabel = transparentLabel(date.format(dayFmt).toUpperCase(), SwingConstants.CENTER, Theme.TINY, Theme.TEXT_DIM());
@@ -603,12 +713,15 @@ public class GymApp extends JFrame {
 
     private JPanel createLiftColumnHeader() {
         JPanel header = new JPanel(new BorderLayout());
-        header.setOpaque(false); header.setMaximumSize(new Dimension(420, 20));
+        header.setOpaque(false); header.setMaximumSize(new Dimension(9999, Scale.dp(20)));
         JLabel left  = transparentLabel("Exercise", SwingConstants.LEFT, Theme.SMALL_BOLD, Theme.TEXT_MUTED());
         JLabel right = transparentLabel("Weight | Sets x Reps | Rest", SwingConstants.RIGHT, Theme.SMALL_BOLD, Theme.TEXT_MUTED());
         header.add(left, BorderLayout.WEST); header.add(right, BorderLayout.EAST);
         return header;
     }
+
+    // Drag-reorder state
+    private int dragFromIndex = -1;
 
     private void refreshExerciseListUI() {
         if (exerciseListPanel == null) return;
@@ -624,8 +737,8 @@ public class GymApp extends JFrame {
                 exerciseListPanel.add(buildRestDayToggleCard(false));
             }
         } else {
-            for (ExerciseData data : currentLogs) {
-                exerciseListPanel.add(buildExerciseCard(currentLogs, data));
+            for (int i = 0; i < currentLogs.size(); i++) {
+                exerciseListPanel.add(buildExerciseCard(currentLogs, currentLogs.get(i), i));
                 exerciseListPanel.add(Box.createRigidArea(new Dimension(0, 8)));
             }
         }
@@ -635,8 +748,8 @@ public class GymApp extends JFrame {
     private JPanel buildRestDayCard() {
         RoundedPanel card = new RoundedPanel(15, new Color(50, 40, 70));
         card.setLayout(new BorderLayout(10, 0));
-        card.setMaximumSize(new Dimension(420, 58)); card.setPreferredSize(new Dimension(420, 58));
-        card.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        card.setMaximumSize(new Dimension(9999, Scale.dp(58))); card.setPreferredSize(new Dimension(440, Scale.dp(58)));
+        card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
         JPanel left = new JPanel(); left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS)); left.setOpaque(false);
         left.add(transparentLabel("\uD83D\uDECC  Rest Day", SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()));
         left.add(transparentLabel("All " + currentSelectedDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "s are rest days", SwingConstants.LEFT, Theme.SMALL, Theme.TEXT_MUTED()));
@@ -655,8 +768,8 @@ public class GymApp extends JFrame {
     private JPanel buildRestDayToggleCard(boolean active) {
         RoundedPanel card = new RoundedPanel(15, Theme.PANEL_DARK());
         card.setLayout(new BorderLayout(10, 0));
-        card.setMaximumSize(new Dimension(420, 52)); card.setPreferredSize(new Dimension(420, 52));
-        card.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        card.setMaximumSize(new Dimension(9999, Scale.dp(52))); card.setPreferredSize(new Dimension(440, Scale.dp(52)));
+        card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(8), Scale.dp(14), Scale.dp(8), Scale.dp(14)));
         card.add(transparentLabel("Mark as Rest Day", SwingConstants.LEFT, Theme.BODY, Theme.TEXT_MUTED()), BorderLayout.WEST);
         RoundedButton btn = new RoundedButton("Set Rest Day", 8);
         btn.setBackground(new Color(80, 60, 110)); btn.setForeground(Color.WHITE);
@@ -669,11 +782,11 @@ public class GymApp extends JFrame {
         return card;
     }
 
-    private JPanel buildExerciseCard(ArrayList<ExerciseData> logs, ExerciseData data) {
+    private JPanel buildExerciseCard(ArrayList<ExerciseData> logs, ExerciseData data, int index) {
         RoundedPanel card = new RoundedPanel(15, Theme.CARD_BG());
-        card.setLayout(new BorderLayout());
-        card.setMaximumSize(new Dimension(420, 55)); card.setPreferredSize(new Dimension(420, 55));
-        card.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        card.setLayout(new BorderLayout(6, 0));
+        card.setMaximumSize(new Dimension(9999, Scale.dp(55))); card.setPreferredSize(new Dimension(440, Scale.dp(55)));
+        card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
 
         JPanel leftWrapper = new JPanel(new BorderLayout(8, 0));
         leftWrapper.setOpaque(false);
@@ -687,22 +800,42 @@ public class GymApp extends JFrame {
         JLabel titleLabel = transparentLabel(data.getName(), SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT());
         leftWrapper.add(completeBox, BorderLayout.WEST);
         leftWrapper.add(titleLabel, BorderLayout.CENTER);
-        card.add(leftWrapper, BorderLayout.WEST);
+        card.add(leftWrapper, BorderLayout.CENTER);
 
         if (isEditMode) {
+            // Drag handle
+            JLabel handle = new JLabel("≡");
+            handle.setFont(new Font("Segoe UI", Font.BOLD, Scale.dp(18)));
+            handle.setForeground(Theme.TEXT_DIM());
+            handle.setOpaque(false);
+            handle.setPreferredSize(new Dimension(Scale.dp(22), Scale.dp(36)));
+            handle.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+            installDragReorder(handle, index, logs);
+            card.add(handle, BorderLayout.WEST);
+
             JPanel editBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
             editBtns.setOpaque(false);
             RoundedButton editBtn = new RoundedButton("Edit", 8);
             editBtn.setBackground(Theme.ACCENT_DARK); editBtn.setForeground(Color.WHITE);
-            editBtn.setPreferredSize(new Dimension(50, 28));
+            editBtn.setPreferredSize(new Dimension(Scale.dp(50), Scale.dp(28)));
             editBtn.addActionListener(e -> editExerciseDialog(data));
             editBtns.add(editBtn);
             RoundedButton deleteBtn = new RoundedButton("Del", 8);
             deleteBtn.setBackground(Theme.DANGER); deleteBtn.setForeground(Color.WHITE);
-            deleteBtn.setPreferredSize(new Dimension(44, 28));
+            deleteBtn.setPreferredSize(new Dimension(Scale.dp(44), Scale.dp(28)));
             deleteBtn.addActionListener(e -> {
+                int confirm = JOptionPane.showConfirmDialog(GymApp.this,
+                    "Remove \"" + data.getName() + "\" from every " +
+                    data.getAddedDate().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "?",
+                    "Delete Exercise", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) return;
                 removeExerciseFromAllCompletedDates(data);
-                masterExercises.remove(data); refreshWorkoutScreen(); save();
+                masterExercises.remove(data);
+                if (getExercisesForDate(currentSelectedDate).isEmpty()) {
+                    isEditMode = false;
+                    if (globalEditBtn != null) { globalEditBtn.setText("Edit"); globalEditBtn.setBackground(Theme.ACCENT); }
+                }
+                refreshWorkoutScreen(); save();
             });
             editBtns.add(deleteBtn);
             card.add(editBtns, BorderLayout.EAST);
@@ -716,6 +849,36 @@ public class GymApp extends JFrame {
             });
         }
         return card;
+    }
+
+    private void installDragReorder(JLabel handle, int cardIndex, ArrayList<ExerciseData> logs) {
+        final int[] fromIdx = {cardIndex};
+        handle.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e)  { dragFromIndex = fromIdx[0]; }
+            @Override public void mouseReleased(MouseEvent e) { dragFromIndex = -1; }
+        });
+        handle.addMouseMotionListener(new MouseAdapter() {
+            @Override public void mouseDragged(MouseEvent e) {
+                if (dragFromIndex < 0) return;
+                int curY = SwingUtilities.convertPoint(handle, e.getPoint(), exerciseListPanel).y;
+                int cardH = Scale.dp(55) + Scale.dp(8);
+                int toIdx = Math.max(0, Math.min(logs.size()-1, curY / Math.max(1, cardH)));
+                if (toIdx != dragFromIndex) {
+                    ExerciseData from = logs.get(dragFromIndex);
+                    ExerciseData to   = logs.get(toIdx);
+                    int fi = masterExercises.indexOf(from);
+                    int ti = masterExercises.indexOf(to);
+                    if (fi >= 0 && ti >= 0) {
+                        masterExercises.set(fi, to);
+                        masterExercises.set(ti, from);
+                        dragFromIndex = toIdx;
+                        fromIdx[0]    = toIdx;
+                        refreshExerciseListUI();
+                        save();
+                    }
+                }
+            }
+        });
     }
 
     private JPanel createMacroTrackerScreen() {
@@ -871,8 +1034,8 @@ public class GymApp extends JFrame {
     private JPanel buildRecordCard(RecordData record) {
         RoundedPanel card = new RoundedPanel(15, Theme.CARD_BG());
         card.setLayout(new BorderLayout());
-        card.setMaximumSize(new Dimension(440, 58)); card.setPreferredSize(new Dimension(440, 58));
-        card.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        card.setMaximumSize(new Dimension(9999, Scale.dp(58))); card.setPreferredSize(new Dimension(440, Scale.dp(58)));
+        card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
         card.add(transparentLabel(record.getName(), SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()), BorderLayout.WEST);
         if (isPrEditMode) {
             JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0)); btns.setOpaque(false);
@@ -886,9 +1049,8 @@ public class GymApp extends JFrame {
             delBtn.addActionListener(e -> { personalRecords.remove(record); refreshRecordCards(); save(); }); btns.add(delBtn);
             card.add(btns, BorderLayout.EAST);
         } else {
-            String w = record.getWeight();
-            if (w != null && !w.trim().isEmpty() && !w.matches(".*[a-zA-Z].*")) w = w.trim() + " kg";
-            String display = (w == null || w.trim().isEmpty()) ? "— not set" : w;
+            String rawW = record.getWeight();
+            String display = (rawW == null || rawW.trim().isEmpty()) ? "— not set" : normaliseWeight(rawW) + " kg";
             card.add(transparentLabel(display, SwingConstants.RIGHT, Theme.BODY, Theme.TEXT_MUTED()), BorderLayout.EAST);
         }
         return card;
@@ -975,7 +1137,22 @@ public class GymApp extends JFrame {
         for (BodyWeightEntry entry : reversed) {
             String val = String.format("%.1f kg", entry.getWeightKg());
             val += hm > 0 ? String.format("  |  BMI %.1f", entry.getWeightKg()/(hm*hm)) : "  |  Set height for BMI";
-            bodyLogPanel.add(new StatCardPanel(entry.getDate().toString(), val, false, ignored -> {}));
+            RoundedPanel bodyCard = new RoundedPanel(14, Theme.CARD_BG());
+            bodyCard.setLayout(new BorderLayout());
+            bodyCard.setMaximumSize(new Dimension(9999, Scale.dp(52))); bodyCard.setPreferredSize(new Dimension(440, Scale.dp(52)));
+            bodyCard.setBorder(BorderFactory.createEmptyBorder(Scale.dp(8), Scale.dp(14), Scale.dp(8), Scale.dp(14)));
+            JPanel bodyLeft = new JPanel(); bodyLeft.setLayout(new BoxLayout(bodyLeft, BoxLayout.Y_AXIS)); bodyLeft.setOpaque(false);
+            bodyLeft.add(transparentLabel(entry.getDate().toString(), SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()));
+            bodyLeft.add(transparentLabel(val, SwingConstants.LEFT, Theme.SMALL, Theme.TEXT_MUTED()));
+            bodyCard.add(bodyLeft, BorderLayout.WEST);
+            RoundedButton delBody = new RoundedButton("Del", 8);
+            delBody.setBackground(Theme.DANGER); delBody.setForeground(Color.WHITE);
+            delBody.setPreferredSize(new Dimension(Scale.dp(44), Scale.dp(26)));
+            delBody.addActionListener(e -> {
+                bodyEntries.remove(entry); refreshBodyUI(); save();
+            });
+            bodyCard.add(delBody, BorderLayout.EAST);
+            bodyLogPanel.add(bodyCard);
             bodyLogPanel.add(Box.createRigidArea(new Dimension(0, 8)));
         }
         bodyLogPanel.revalidate(); bodyLogPanel.repaint();
@@ -1016,14 +1193,22 @@ public class GymApp extends JFrame {
     private JPanel buildCardioCard(CardioEntry entry) {
         RoundedPanel card = new RoundedPanel(15, Theme.CARD_BG());
         card.setLayout(new BorderLayout());
-        card.setMaximumSize(new Dimension(440, 72)); card.setPreferredSize(new Dimension(440, 72));
-        card.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        card.setMaximumSize(new Dimension(9999, Scale.dp(72))); card.setPreferredSize(new Dimension(440, Scale.dp(72)));
+        card.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
         JPanel left = new JPanel(); left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS)); left.setOpaque(false);
         left.add(transparentLabel(entry.getType() + "  \u2022  " + entry.getDate(), SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()));
         left.add(Box.createRigidArea(new Dimension(0, 3)));
-        String detail = String.format("%.1f km  |  %d min", entry.getDistanceKm(), entry.getDurationMinutes());
-        if (entry.getDistanceKm() > 0 && entry.getDurationMinutes() > 0)
-            detail += String.format("  |  %.1f min/km", entry.getPaceMinPerKm());
+        String detail;
+        if (entry.getDistanceKm() > 0 && entry.getDurationMinutes() > 0) {
+            detail = String.format("%.1f km  |  %d min  |  %.1f min/km",
+                    entry.getDistanceKm(), entry.getDurationMinutes(), entry.getPaceMinPerKm());
+        } else if (entry.getDistanceKm() > 0) {
+            detail = String.format("%.1f km", entry.getDistanceKm());
+        } else if (entry.getDurationMinutes() > 0) {
+            detail = String.format("%d min", entry.getDurationMinutes());
+        } else {
+            detail = "No distance or time logged";
+        }
         if (entry.getNotes() != null && !entry.getNotes().isEmpty()) detail += "  |  " + entry.getNotes();
         left.add(transparentLabel(detail, SwingConstants.LEFT, Theme.SMALL, Theme.TEXT_MUTED()));
         card.add(left, BorderLayout.WEST);
@@ -1047,19 +1232,24 @@ public class GymApp extends JFrame {
         String[] types = {"Run","Cycle","Row","Swim","Walk","Other"};
         JComboBox<String> typeBox = new JComboBox<>(types);
         typeBox.setSelectedItem(entry.getType());
+        JTextField dateField     = new JTextField(entry.getDate().toString());
         JTextField distField     = new JTextField(String.valueOf(entry.getDistanceKm()));
         JTextField durationField = new JTextField(String.valueOf(entry.getDurationMinutes()));
         JTextField notesField    = new JTextField(entry.getNotes() == null ? "" : entry.getNotes());
-        JPanel p = new JPanel(new GridLayout(4,2,10,10)); p.setBorder(BorderFactory.createEmptyBorder(10,6,10,6));
+        JPanel p = new JPanel(new GridLayout(5,2,10,10)); p.setBorder(BorderFactory.createEmptyBorder(10,6,10,6));
         p.add(new JLabel("Type:"));               p.add(typeBox);
+        p.add(new JLabel("Date (YYYY-MM-DD):"));  p.add(dateField);
         p.add(new JLabel("Distance (km):"));      p.add(distField);
         p.add(new JLabel("Duration (minutes):")); p.add(durationField);
-        p.add(new JLabel("Notes:"));   p.add(notesField);
+        p.add(new JLabel("Notes:"));              p.add(notesField);
         if (JOptionPane.showConfirmDialog(this, p, "Edit Cardio", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             try {
                 int idx = cardioEntries.indexOf(entry);
                 if (idx >= 0) {
-                    cardioEntries.set(idx, new CardioEntry(entry.getDate(),
+                    java.time.LocalDate newDate;
+                    try { newDate = java.time.LocalDate.parse(dateField.getText().trim()); }
+                    catch (Exception ex2) { newDate = entry.getDate(); }
+                    cardioEntries.set(idx, new CardioEntry(newDate,
                             (String) typeBox.getSelectedItem(),
                             Double.parseDouble(distField.getText().trim()),
                             Integer.parseInt(durationField.getText().trim()),
@@ -1080,7 +1270,7 @@ public class GymApp extends JFrame {
         RoundedButton assessBtn = new RoundedButton("Analyse My Programme", 14);
         assessBtn.setBackground(Theme.ACCENT); assessBtn.setForeground(Color.WHITE);
         assessBtn.setAlignmentX(JPanel.CENTER_ALIGNMENT);
-        assessBtn.setMaximumSize(new Dimension(360, 44)); assessBtn.setPreferredSize(new Dimension(360, 44));
+        assessBtn.setMaximumSize(new Dimension(9999, Scale.dp(44))); assessBtn.setPreferredSize(new Dimension(360, Scale.dp(44)));
         assessBtn.addActionListener(e -> runAssessment());
         topSection.add(assessBtn);
         topSection.add(Box.createRigidArea(new Dimension(0, 6)));
@@ -1225,53 +1415,74 @@ public class GymApp extends JFrame {
         JPanel center = new JPanel(); center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS)); center.setOpaque(false);
         JScrollPane scroll = new JScrollPane(center); styleScroll(scroll); enableVerticalDragScroll(scroll);
 
-        center.add(Box.createRigidArea(new Dimension(0, 14)));
-        addSectionLabel(center, "Appearance");
+        // App badge at top
+        center.add(Box.createRigidArea(new Dimension(0, 18)));
+        RoundedPanel badge = new RoundedPanel(20, Theme.CARD_BG());
+        badge.setLayout(new BoxLayout(badge, BoxLayout.Y_AXIS));
+        badge.setMaximumSize(new Dimension(440, 78)); badge.setPreferredSize(new Dimension(440, 78));
+        badge.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+        JLabel appName = transparentLabel("IronPulse", SwingConstants.CENTER, Theme.TITLE_FONT, Theme.ACCENT);
+        appName.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+        JLabel appSub  = transparentLabel("Gym Tracker  •  v12", SwingConstants.CENTER, Theme.SMALL, Theme.TEXT_MUTED());
+        appSub.setAlignmentX(JPanel.CENTER_ALIGNMENT);
+        badge.add(appName); badge.add(Box.createRigidArea(new Dimension(0, 4))); badge.add(appSub);
+        center.add(badge);
+
+        center.add(Box.createRigidArea(new Dimension(0, 20)));
+        addSettingsSectionHeader(center, "APPEARANCE");
         center.add(buildSettingsToggleRow("Dark Mode", "Switch between dark and light theme", Theme.isDark(), toggled -> {
             Theme.setDark(toggled); AppSettings.setDarkMode(toggled);
             SwingUtilities.updateComponentTreeUI(GymApp.this); GymApp.this.repaint();
         }));
-        center.add(Box.createRigidArea(new Dimension(0, 14)));
-        addSectionLabel(center, "Workout Defaults");
-        center.add(buildSettingsInfoRow("Default Rest Time", "90s (set per exercise)"));
+
+        center.add(Box.createRigidArea(new Dimension(0, 20)));
+        addSettingsSectionHeader(center, "WORKOUT");
+        center.add(buildSettingsInfoRow("\uD83D\uDD52  Rest Default", "90 seconds per exercise"));
         center.add(Box.createRigidArea(new Dimension(0, 8)));
-        center.add(buildSettingsInfoRow("Exercise Visibility", "Added date onwards only"));
+        center.add(buildSettingsInfoRow("\uD83D\uDCC5  Schedule", "Exercises repeat every 7 days"));
         center.add(Box.createRigidArea(new Dimension(0, 8)));
-        center.add(buildSettingsInfoRow("Streak Logic", "Breaks only if day has exercises & none done"));
-        center.add(Box.createRigidArea(new Dimension(0, 14)));
-        addSectionLabel(center, "Data");
-        center.add(buildSettingsActionRow("Save All Data", "Writes to ~/.ironpulse/", Theme.ACCENT, () -> {
+        center.add(buildSettingsInfoRow("\uD83D\uDD25  Streak", "Resets if today's workout is missed"));
+
+        center.add(Box.createRigidArea(new Dimension(0, 20)));
+        addSettingsSectionHeader(center, "DATA");
+        center.add(buildSettingsActionRow("\uD83D\uDCBE  Save Now", "Force-write all data to disk", Theme.ACCENT, () -> {
             save(); JOptionPane.showMessageDialog(GymApp.this, "Saved to ~/.ironpulse/");
         }));
         center.add(Box.createRigidArea(new Dimension(0, 8)));
-        center.add(buildSettingsActionRow("Clear Today's Exercises", "Removes exercises added today", Theme.DANGER, () -> {
+        center.add(buildSettingsActionRow("\uD83D\uDDD1  Clear Selected Day", "Remove exercises added on " + currentSelectedDate, Theme.DANGER, () -> {
             int confirm = JOptionPane.showConfirmDialog(GymApp.this,
                     "Remove all exercises added on " + currentSelectedDate + "?", "Confirm", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 masterExercises.removeIf(ex -> ex.getAddedDate().equals(currentSelectedDate));
                 datedWorkoutLogs.remove(currentSelectedDate);
                 loggedSetsByDate.remove(currentSelectedDate);
-                save(); JOptionPane.showMessageDialog(GymApp.this, "Cleared.");
+                refreshWorkoutScreen(); save();
+                JOptionPane.showMessageDialog(GymApp.this, "Cleared.");
             }
         }));
-        center.add(Box.createRigidArea(new Dimension(0, 14)));
-        addSectionLabel(center, "About");
-        center.add(buildSettingsInfoRow("App", "IronPulse Gym Tracker"));
         center.add(Box.createRigidArea(new Dimension(0, 8)));
-        center.add(buildSettingsInfoRow("Data location", "~/.ironpulse/"));
+        center.add(buildSettingsInfoRow("\uD83D\uDCC1  Location", "~/.ironpulse/"));
         center.add(Box.createRigidArea(new Dimension(0, 8)));
-        center.add(buildSettingsInfoRow("Auto-save", "On every change"));
-        center.add(Box.createRigidArea(new Dimension(0, 20)));
+        center.add(buildSettingsInfoRow("\u2705  Auto-save", "On every change"));
+
+        center.add(Box.createRigidArea(new Dimension(0, 24)));
 
         screen.add(scroll, BorderLayout.CENTER);
         return screen;
     }
 
+    private void addSettingsSectionHeader(JPanel container, String text) {
+        JLabel label = transparentLabel(text, SwingConstants.LEFT, Theme.SMALL_BOLD, Theme.TEXT_MUTED());
+        label.setAlignmentX(JPanel.LEFT_ALIGNMENT);
+        label.setBorder(BorderFactory.createEmptyBorder(0, 2, 6, 0));
+        container.add(label);
+    }
+
     private JPanel buildSettingsToggleRow(String label, String subtitle, boolean initial, java.util.function.Consumer<Boolean> onChange) {
         RoundedPanel row = new RoundedPanel(14, Theme.CARD_BG());
         row.setLayout(new BorderLayout(12, 0));
-        row.setMaximumSize(new Dimension(440, 66)); row.setPreferredSize(new Dimension(440, 66));
-        row.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        row.setMaximumSize(new Dimension(9999, Scale.dp(66))); row.setPreferredSize(new Dimension(440, Scale.dp(66)));
+        row.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
         JPanel textCol = new JPanel(); textCol.setLayout(new BoxLayout(textCol, BoxLayout.Y_AXIS)); textCol.setOpaque(false);
         textCol.add(transparentLabel(label, SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()));
         textCol.add(Box.createRigidArea(new Dimension(0,2)));
@@ -1385,8 +1596,8 @@ public class GymApp extends JFrame {
     private JPanel buildSettingsInfoRow(String label, String value) {
         RoundedPanel row = new RoundedPanel(14, Theme.CARD_BG());
         row.setLayout(new BorderLayout());
-        row.setMaximumSize(new Dimension(440, 52)); row.setPreferredSize(new Dimension(440, 52));
-        row.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        row.setMaximumSize(new Dimension(9999, Scale.dp(52))); row.setPreferredSize(new Dimension(440, Scale.dp(52)));
+        row.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
         row.add(transparentLabel(label, SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()), BorderLayout.WEST);
         row.add(transparentLabel(value, SwingConstants.RIGHT, Theme.SMALL, Theme.TEXT_MUTED()), BorderLayout.EAST);
         return row;
@@ -1395,8 +1606,8 @@ public class GymApp extends JFrame {
     private JPanel buildSettingsActionRow(String label, String subtitle, Color accentColor, Runnable action) {
         RoundedPanel row = new RoundedPanel(14, Theme.CARD_BG());
         row.setLayout(new BorderLayout(12, 0));
-        row.setMaximumSize(new Dimension(440, 66)); row.setPreferredSize(new Dimension(440, 66));
-        row.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        row.setMaximumSize(new Dimension(9999, Scale.dp(66))); row.setPreferredSize(new Dimension(440, Scale.dp(66)));
+        row.setBorder(BorderFactory.createEmptyBorder(Scale.dp(10), Scale.dp(14), Scale.dp(10), Scale.dp(14)));
         JPanel textCol = new JPanel(); textCol.setLayout(new BoxLayout(textCol, BoxLayout.Y_AXIS)); textCol.setOpaque(false);
         textCol.add(transparentLabel(label, SwingConstants.LEFT, Theme.BODY_BOLD, Theme.TEXT()));
         textCol.add(Box.createRigidArea(new Dimension(0,2)));
@@ -1454,7 +1665,9 @@ public class GymApp extends JFrame {
             restTimerLabel.setText("Rest timer ready"); return;
         }
         exerciseDetailTitle.setText(selectedExercise.getName());
-        exerciseDetailStats.setText(formatExerciseSummary(selectedExercise) + "  |  Sets logged " + getLoggedSets(selectedExercise));
+        int logged = getLoggedSets(selectedExercise);
+        int target = getTargetSets(selectedExercise);
+        exerciseDetailStats.setText(formatExerciseSummary(selectedExercise) + "  |  " + logged + " / " + target + " sets done");
         if (remainingRestSeconds <= 0) restTimerLabel.setText("Rest timer ready");
     }
 
@@ -1506,8 +1719,16 @@ public class GymApp extends JFrame {
         if (JOptionPane.showConfirmDialog(this, p, "Add Exercise", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             String name = nameField.getText().trim();
             if (name.isEmpty()) return;
+            // Duplicate check
+            ArrayList<ExerciseData> existing = getExercisesForDate(currentSelectedDate);
+            boolean duplicate = existing.stream().anyMatch(ex -> ex.getName().equalsIgnoreCase(name));
+            if (duplicate) {
+                int confirm = JOptionPane.showConfirmDialog(this,
+                    name + " is already on this day. Add again?", "Duplicate", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) return;
+            }
             masterExercises.add(new ExerciseData(name,
-                    weightField.getText().trim(),
+                    normaliseWeight(weightField.getText()),
                     parsePositiveInt(setsField.getText(),3,1)+"x"+parsePositiveInt(repsField.getText(),10,1),
                     parsePositiveInt(restField.getText(),90,5), currentSelectedDate));
             refreshWorkoutScreen(); save();
@@ -1528,7 +1749,7 @@ public class GymApp extends JFrame {
         p.add(new JLabel("Rest (seconds):"));   p.add(restField);
         if (JOptionPane.showConfirmDialog(this, new Object[]{"Edit: "+data.getName(), p},
                 "Edit Exercise", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            data.setWeight(weightField.getText().trim());
+            data.setWeight(normaliseWeight(weightField.getText()));
             data.setReps(parsePositiveInt(setsField.getText(),3,1)+"x"+parsePositiveInt(repsField.getText(),10,1));
             data.setRestSeconds(parsePositiveInt(restField.getText(),90,5));
             refreshExerciseListUI(); save();
@@ -1542,7 +1763,7 @@ public class GymApp extends JFrame {
         p.add(new JLabel("Best weight (kg/lbs):")); p.add(weightField);
         if (JOptionPane.showConfirmDialog(this,p,"Add PR",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION
                 && !nameField.getText().trim().isEmpty()) {
-            personalRecords.add(new RecordData(nameField.getText().trim(),weightField.getText().trim()));
+            personalRecords.add(new RecordData(nameField.getText().trim(), normaliseWeight(weightField.getText())));
             refreshRecordCards(); save();
         }
     }
@@ -1553,7 +1774,7 @@ public class GymApp extends JFrame {
         p.add(new JLabel("Best weight (kg/lbs):")); p.add(weightField);
         if (JOptionPane.showConfirmDialog(this,new Object[]{"Edit: "+record.getName(),p},
                 "Edit PR",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION) {
-            record.setWeight(weightField.getText().trim()); refreshRecordCards(); save();
+            record.setWeight(normaliseWeight(weightField.getText())); refreshRecordCards(); save();
         }
     }
 
@@ -1668,9 +1889,19 @@ public class GymApp extends JFrame {
         return formatWeight(data)+" | "+reps+" | "+data.getRestSeconds()+"s";
     }
 
+    /** Strips all non-numeric characters except decimal point, returns just the number string. */
+    private String normaliseWeight(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return "";
+        // Remove unit suffixes and whitespace, keep only digits and dot
+        String stripped = raw.trim().replaceAll("(?i)\\s*(kg|lbs|lb|kgs)\\s*", "").replaceAll("[^0-9.]", "").trim();
+        return stripped.isEmpty() ? "" : stripped;
+    }
+
     private String formatWeight(ExerciseData data) {
-        if (data.getWeight()==null||data.getWeight().trim().isEmpty()) return "- kg";
-        return data.getWeight().trim()+" kg";
+        String w = data.getWeight();
+        if (w == null || w.trim().isEmpty()) return "–";
+        // Already normalised to a plain number; display with kg
+        return w.trim() + " kg";
     }
 
     private void addSectionLabel(JPanel container, String text) {

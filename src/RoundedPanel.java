@@ -27,24 +27,30 @@ public class RoundedPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        int    inset = selected ? 4 : 1;
+        int    inset = selected ? 3 : 1;
         double w     = getWidth()  - inset * 2.0;
         double h     = getHeight() - inset * 2.0;
+        int    cr    = Scale.dp(cornerRadius);
 
-        g2.setColor(new Color(0, 0, 0, selected ? 70 : 45));
-        g2.fill(new RoundRectangle2D.Double(inset + 2, inset + 5, w - 4, h - 4, cornerRadius, cornerRadius));
+        // Shadow — lighter in light mode
+        int shadowAlpha = Theme.isDark() ? (selected ? 60 : 36) : (selected ? 28 : 14);
+        g2.setColor(new Color(0, 0, 0, shadowAlpha));
+        g2.fill(new RoundRectangle2D.Double(inset + 1, inset + 4, w - 2, h - 3, cr, cr));
 
+        // Body
         g2.setPaint(Theme.verticalGradient(backgroundColor, getWidth(), getHeight()));
-        g2.fill(new RoundRectangle2D.Double(inset, inset, w, h, cornerRadius, cornerRadius));
+        g2.fill(new RoundRectangle2D.Double(inset, inset, w, h, cr, cr));
 
+        // Border
         g2.setColor(Theme.BORDER());
         g2.setStroke(new BasicStroke(1.1f));
-        g2.draw(new RoundRectangle2D.Double(inset + 0.5, inset + 0.5, w - 1, h - 1, cornerRadius, cornerRadius));
+        g2.draw(new RoundRectangle2D.Double(inset + 0.5, inset + 0.5, w - 1, h - 1, cr, cr));
 
+        // Selection glow
         if (selected) {
             g2.setColor(Theme.ACCENT_GLOW);
-            g2.setStroke(new BasicStroke(2.5f));
-            g2.draw(new RoundRectangle2D.Double(2, 2, getWidth() - 4.0, getHeight() - 4.0, cornerRadius, cornerRadius));
+            g2.setStroke(new BasicStroke(2f));
+            g2.draw(new RoundRectangle2D.Double(1.5, 1.5, getWidth() - 3.0, getHeight() - 3.0, cr, cr));
         }
         g2.dispose();
     }

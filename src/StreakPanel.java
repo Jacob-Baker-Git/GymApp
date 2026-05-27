@@ -6,8 +6,10 @@ import java.util.*;
 
 public class StreakPanel extends JPanel {
 
-    private int streak        = 0;
-    private int totalWorkouts = 0;
+    private int     streak        = 0;
+    private int     totalWorkouts = 0;
+    private boolean todayIsRest   = false;
+    private boolean todayHasWork  = false;
 
     public StreakPanel() {
         setOpaque(false);
@@ -25,8 +27,10 @@ public class StreakPanel extends JPanel {
 
         // --- Is today complete? ---
         ArrayList<ExerciseData> todayPlanned = getPlanned(master, today);
-        boolean todayIsRest   = restDays.contains(today.getDayOfWeek());
-        boolean todayHasWork  = !todayPlanned.isEmpty();
+        todayIsRest  = restDays.contains(today.getDayOfWeek());
+        todayHasWork = !todayPlanned.isEmpty();
+        boolean todayIsRest   = this.todayIsRest;
+        boolean todayHasWork  = this.todayHasWork;
         boolean todayComplete = todayHasWork && isDayComplete(todayPlanned, logs.get(today));
         boolean todayMissed   = todayHasWork && !todayIsRest && !todayComplete;
 
@@ -114,7 +118,11 @@ public class StreakPanel extends JPanel {
         int midY = (h - barH) / 2 + 5;
         g2.setFont(Theme.BODY_BOLD);
         g2.setColor(streak > 0 ? Theme.ACCENT : Theme.TEXT_MUTED());
-        String streakStr = streak > 0 ? "\uD83D\uDD25  " + streak + " day streak" : "Complete today to start a streak";
+        String streakStr;
+        if (streak > 0)              streakStr = "\uD83D\uDD25  " + streak + " day streak";
+        else if (todayIsRest)        streakStr = "\uD83D\uDECC  Rest day — streak protected";
+        else if (!todayHasWork)      streakStr = "No exercises today";
+        else                         streakStr = "Complete today to start a streak";
         g2.drawString(streakStr, 14, midY);
 
         // Total workouts right-aligned
